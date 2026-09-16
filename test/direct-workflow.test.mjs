@@ -22,7 +22,7 @@ test('direct Google Doc input keeps the selected document tab and never needs a 
   assert.deepEqual(directDocumentReference('https://docs.google.com/document/d/direct-doc-123/edit?tab=article'),{documentId:'direct-doc-123',documentUrl:'https://docs.google.com/document/d/direct-doc-123/edit',tabId:'article'});
   const read=async url=>{assert.match(url,/documents\/direct-doc-123/);return googleDoc;};
   await assert.rejects(directSource({documentUrl:'https://docs.google.com/document/d/direct-doc-123/edit'},{read}),error=>error.status===409&&error.details.tabs.length===2);
-  const source=await directSource({documentUrl:'https://docs.google.com/document/d/direct-doc-123/edit?tab=article'},{read});
+  const source=await directSource({documentUrl:'https://docs.google.com/document/d/direct-doc-123/edit?tab=article',clientKey:'Unassigned'},{read});
   assert.equal(source.row.order,'Direct Google Doc');assert.equal(source.row.tabId,'article');assert.equal(source.doc.selectedTabId,'article');assert.equal(source.doc.pageTitle,'How Does This Work?');assert.equal(source.doc.paragraphs.some(item=>item.text==='Overview text.'),false);
 });
 

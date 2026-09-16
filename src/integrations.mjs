@@ -38,8 +38,9 @@ export async function clientProfiles(read=getGoogle){
 export async function directSource(input,{read=getGoogle}={}){
   const ref=directDocumentReference(input.documentUrl),raw=await read(`https://docs.googleapis.com/v1/documents/${ref.documentId}?includeTabsContent=true`),tabs=documentTabs(raw),tabId=input.tabId||ref.tabId;
   if(tabs.length>1&&!tabId){const e=new Error('This Google Doc contains multiple tabs. Choose the article tab before continuing.');e.status=409;e.details={tabs};throw e;}
-  let client={key:String(input.clientKey||'Unassigned').trim()||'Unassigned',homepage:String(input.homepage||'').trim(),name:String(input.firmName||'').trim(),address:String(input.address||'').trim(),phone:String(input.phone||'').trim(),attorneys:[],cta:'',disclaimer:'',ctaRequired:false,disclaimerRequired:false};
-  if(input.clientKey){try{client=selectClient(await clientProfiles(read),input.clientKey);}catch(e){if(!input.firmName)throw e;}}
+  const requestedClient=String(input.clientKey||'').trim(),directoryClient=requestedClient&&normalize(requestedClient)!=='unassigned';
+  let client={key:directoryClient?requestedClient:'Unassigned',homepage:String(input.homepage||'').trim(),name:String(input.firmName||'').trim(),address:String(input.address||'').trim(),phone:String(input.phone||'').trim(),attorneys:[],cta:'',disclaimer:'',ctaRequired:false,disclaimerRequired:false};
+  if(directoryClient){try{client=selectClient(await clientProfiles(read),requestedClient);}catch(e){if(!input.firmName)throw e;}}
   for(const key of ['homepage','name','address','phone'])if(String(input[{homepage:'homepage',name:'firmName',address:'address',phone:'phone'}[key]]||'').trim())client[key]=String(input[{homepage:'homepage',name:'firmName',address:'address',phone:'phone'}[key]]).trim();
   const folderUrl=String(input.folderUrl||'').trim(),pageUrl=String(input.pageUrl||'').trim();
   if(folderUrl&&!googleId(folderUrl,'folder'))throw new Error('Use a valid Google Drive folder URL for the Visual folder.');
