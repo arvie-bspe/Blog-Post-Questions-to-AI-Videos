@@ -1,0 +1,4 @@
+# The rulebook is fingerprinted byte-for-byte; preserve its existing line endings.
+rules/GLOBAL_RULES.md -text
+*.onnx binary
+*.png binary
