@@ -15,6 +15,7 @@ Required environment variables:
 - `SADTALKER_PYTHON`: Python executable in SadTalker's separate pinned environment.
 - `LOCAL_MEDIA_DEVICE`: `cpu` is the safe default for the current 2 GB GPU; use another value only after a successful benchmark.
 - `MEDIA_RENDER_TIMEOUT_MS`: optional local render timeout. The default is six hours because CPU-only talking-video generation is slow.
+- `FFMPEG_PATH`: optional full path to `ffmpeg.exe`; the repository-local Windows binary is detected when present.
 
 Use two isolated Python environments because current Kokoro ONNX and SadTalker's older pinned NumPy stack conflict. `LOCAL_MEDIA_PYTHON` runs this orchestrator with `media-requirements.txt`; `SADTALKER_PYTHON` runs SadTalker's `inference.py`. Kokoro's duration output supplies caption timing without a second speech-recognition model. Review and pin the exact model assets and licenses before production.
 

@@ -52,7 +52,10 @@ def animate(image, audio, output_dir, final):
     python=os.environ.get("SADTALKER_PYTHON",sys.executable)
     command=[python,str(inference),"--driven_audio",str(audio),"--source_image",str(image),"--result_dir",str(results),"--still","--preprocess","full","--size","256"]
     if os.environ.get("LOCAL_MEDIA_DEVICE", "cpu").lower()=="cpu": command.append("--cpu")
-    subprocess.run(command,cwd=sad,check=True)
+    child_env=os.environ.copy()
+    ffmpeg=Path(child_env.get("FFMPEG_PATH",Path(__file__).resolve().parents[1] / "vendor" / "ffmpeg" / "bin" / "ffmpeg.exe"))
+    if ffmpeg.is_file(): child_env["PATH"]=str(ffmpeg.parent)+os.pathsep+child_env.get("PATH","")
+    subprocess.run(command,cwd=sad,env=child_env,check=True)
     videos=sorted(results.rglob("*.mp4"),key=lambda p:p.stat().st_mtime,reverse=True)
     if not videos: raise RuntimeError("SadTalker returned no MP4 file.")
     shutil.copy2(videos[0],final)
