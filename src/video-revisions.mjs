@@ -5,11 +5,12 @@ import {hash} from './domain.mjs';
 import {visualSettings} from './portrait-media.mjs';
 import {approved,scriptText} from './video-domain.mjs';
 import {layoutVersion,endCardData,detectorVersion} from './visual-checks.mjs';
-import {rulesHash} from './rules.mjs';
+import {rulesHash,appearanceRulesHash} from './rules.mjs';
 import {prepare as prepareHeyGen,captionCase} from './heygen-domain.mjs';
 import {requireArticleIdentity} from './article-identity.mjs';
 import {recordQuestionReview} from './question-approval.mjs';
 import {matchingPresenter} from './presenter-compatibility.mjs';
+import {queueLocalReplacement} from './local-video.mjs';
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 export class VideoRevisions{
@@ -33,22 +34,23 @@ export class VideoRevisions{
     if(this.applying.has(id)||s.active.has(id))fail('This video is already processing.',409);this.applying.add(id);
     try{
       const old=s.get(id),parent=s.store.get(old.parentId),approvalHash=approved(parent,old.index);
-      if(old.provider!=='heygen'||!old.files.original||!old.files.voice)fail('Existing HeyGen source footage and speech are required for a free layout rebuild.');
+      if(!['heygen','local_worker'].includes(old.provider)||!old.files.original||!old.files.voice)fail('Existing source footage and speech are required for a layout rebuild.');
       const pair=matchingPresenter(old.avatar,old.voice);
-      if(old.layoutVersion===layoutVersion&&old.detectorVersion===detectorVersion&&old.source.rulesHash===rulesHash)fail('This video already uses the current layout and framing checks. Use Request changes for another correction.');
-      if(old.requests?.video?.state!=='completed')fail('The existing provider request must be complete before rebuilding its footage.');
+      const expectedRules=parent.mode==='direct_google'?appearanceRulesHash:rulesHash;
+      if(old.layoutVersion===layoutVersion&&old.detectorVersion===detectorVersion&&old.source.rulesHash===expectedRules)fail('This video already uses the current layout and framing checks. Use Request changes for another correction.');
+      if(old.provider==='heygen'&&old.requests?.video?.state!=='completed'||old.provider==='local_worker'&&old.requests?.local?.state!=='completed')fail('The existing generation task must be complete before rebuilding its footage.');
       await s.checkFresh(parent,old.index);
       if(approved(s.store.get(parent.id),old.index)!==approvalHash)fail('The approved question changed during this request.',409);
       if(scriptText(parent.plan.videos[old.index])!==old.script||parent.doc.sourceHash!==old.source.sourceHash)fail('The script or article changed. Prepare a new video from the current approved content.');
       const articleIdentity=requireArticleIdentity(parent.doc,parent.plan.articleIdentity);
       const endCard={...endCardData({articleIdentity,script:old.script,source:{targetUrl:parent.row.pageUrl}}),seconds:3};
-      const identity=hash([old.id,old.outputRevision||1,layoutVersion,detectorVersion,approvalHash,endCard]);
+      const identity=hash([old.id,old.outputRevision||1,layoutVersion,detectorVersion,expectedRules,approvalHash,endCard]);
       const exists=s.db.prepare('SELECT payload FROM videos WHERE identity=?').get(identity);if(exists)return JSON.parse(exists.payload);
-      const j={...structuredClone(old),id:randomUUID(),identity,approvalHash,layoutVersion,endCard,client:parent.client,source:{...old.source,rulesHash,targetUrl:parent.row.pageUrl,folderUrl:parent.row.folderUrl},previousVideoId:old.id,created:now(),createdBy:actor,status:'compositing',stage:'compositing',error:null,files:{original:true,voice:true},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,technicalQA:null,visualSettings:visualSettings(),automation:null,layoutRebuild:{fromVideoId:old.id,providerRequests:0}};
+      const j={...structuredClone(old),id:randomUUID(),identity,approvalHash,layoutVersion,endCard,client:parent.client,source:{...old.source,rulesHash:expectedRules,targetUrl:parent.row.pageUrl,folderUrl:parent.row.folderUrl},previousVideoId:old.id,created:now(),createdBy:actor,status:'compositing',stage:'compositing',error:null,files:{original:true,voice:true},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,technicalQA:null,visualSettings:visualSettings(),automation:null,layoutRebuild:{fromVideoId:old.id,providerRequests:0}};
       Object.assign(j,pair,{detectorVersion});
       j.cues=captionCase(old.cues||[],old.script);
       const from=s.directory(old),to=s.directory(j);
-      for(const name of ['presenter.mp4','voice.wav','provider-captions.srt'])if(existsSync(join(from,name)))copyFileSync(join(from,name),join(to,name));
+      for(const name of ['presenter.mp4','voice.wav','provider-captions.srt','alignment.json'])if(existsSync(join(from,name)))copyFileSync(join(from,name),join(to,name));
       j.articleIdentity=articleIdentity;s.save(j);s.active.add(j.id);s.store.record(parent.id,actor,'rebuild_current_layout_without_provider_request');
       (async()=>{await s.ensureLogo(j);await s.work(j);})().catch(e=>{if(!s.closed){j.status='needs_attention';j.error=e.message;s.save(j);}}).finally(()=>s.active.delete(j.id));
       return j;
@@ -64,7 +66,7 @@ export class VideoRevisions{
       if(body.decision==='approve'&&(!body.checkedVideo||!body.checkedCaptions||!body.checkedContacts))fail('Check lips, audio, captions, contacts, logo, thumbnail, and playback before marking ready.');
       if(body.decision==='approve'&&(!body.checkedFraming||!body.checkedNoNap||!body.checkedEndCard))fail('Confirm full-frame upper-torso framing, clean-logo/no-contact speech frames, and the separate white end card.');
       if(body.decision==='reject'&&body.changeType==='layout')visualSettings(body.visualSettings);
-      if(body.decision==='reject'&&body.changeType==='render'&&(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate))fail('Accept the displayed cost of another HeyGen render before requesting this change.');
+      if(body.decision==='reject'&&body.changeType==='render'&&(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate))fail('Accept the displayed generation cost estimate before requesting this change.');
       j.reviews.push({actor,at:now(),decision:body.decision,note:body.note.trim(),checkedVideo:!!body.checkedVideo,checkedCaptions:!!body.checkedCaptions,checkedContacts:!!body.checkedContacts,checkedFraming:!!body.checkedFraming,checkedNoNap:!!body.checkedNoNap,checkedEndCard:!!body.checkedEndCard,authenticated:!s.local,outputRevision:j.outputRevision||1});
       if(body.decision==='approve'){j.status='delivery_pending';j.error=null;s.save(j);s.manifest(j);s.deliver(j.id);return s.get(j.id);}
       j.status='revision_pending';j.revisionRequest={actor,note:body.note.trim(),type:body.changeType||'manual',status:'pending',at:now()};s.save(j);s.store.record(j.parentId,actor,'video_revision_requested');
@@ -89,7 +91,8 @@ export class VideoRevisions{
       (async()=>{if(body.refreshLogo)await s.ensureLogo(j,true);await s.work(j);})().catch(e=>{if(!s.closed){j.status='needs_attention';j.error=e.message;j.revisionRequest.status='failed';s.save(j);}}).finally(()=>s.active.delete(id));return j;
     }
     if(type==='render'){
-      if(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate)fail('Accept the displayed cost for a new HeyGen render.');
+      if(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate)fail('Accept the displayed generation estimate before creating a replacement.');
+      if(j.provider==='local_worker')return await queueLocalReplacement(s,j,actor);
       let voice=body.voiceId?s.voices.get(body.voiceId):j.voice;if(!voice)fail('Select an available English voice from the library.');
       voice=matchingPresenter(j.avatar,voice).voice;
       const replacement={...structuredClone(j),id:randomUUID(),identity:hash([j.id,'requested_replacement',j.revisionRequest.at]),voice:{id:voice.id,name:voice.name,language:voice.language,gender:voice.gender},previousVideoId:j.id,generationVersion:(j.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,authorization:null,automation:null};

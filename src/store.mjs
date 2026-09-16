@@ -13,7 +13,7 @@ export class Store {
     if(r)return JSON.parse(r.payload);
     const job={...data,id:randomUUID(),created:new Date().toISOString(),status:'inspected',reviews:[]};this.save(job);return job;
   }
-  save(job){job.updated=new Date().toISOString();job.revision=(job.revision||0)+1;this.db.prepare('INSERT INTO jobs VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated,payload=excluded.payload').run(job.id,job.identity,job.updated,JSON.stringify(job));return job;}
+  save(job){job.updated=new Date().toISOString();job.revision=(job.revision||0)+1;this.db.prepare('INSERT INTO jobs VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET identity=excluded.identity,updated=excluded.updated,payload=excluded.payload').run(job.id,job.identity,job.updated,JSON.stringify(job));return job;}
   record(id,actor,action){this.db.prepare('INSERT INTO audit(job,at,actor,action) VALUES(?,?,?,?)').run(id,new Date().toISOString(),actor,action);}
   consume(limit){
     const day=new Date().toISOString().slice(0,10);

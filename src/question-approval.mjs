@@ -1,5 +1,6 @@
-import {hash,validatePlan} from './domain.mjs';
+import {hash,validateForJob} from './domain.mjs';
 import {rulesHash} from './rules.mjs';
+import {directMode,scriptPolicyHash} from './workflow-config.mjs';
 export function questionPlan(job,index){
  if(!Number.isInteger(index)||!job?.plan?.videos?.[index])throw new Error('Choose one specific question to review. Article-wide approval is disabled.');
  return {...job.plan,videos:[job.plan.videos[index]],skipped:[]};
@@ -8,11 +9,12 @@ export function questionHash(job,index){const p=questionPlan(job,index);return h
 export function questionState(job,index){
  const fingerprint=questionHash(job,index),reviews=(job.questionReviews||[]).filter(r=>r.index===index&&r.draftHash===fingerprint),last=reviews.at(-1),request=job.questionRequests?.[index];
  const pending=request?.draftHash===fingerprint&&['working','awaiting_manual_update','failed'].includes(request.status);
- return {index,draftHash:fingerprint,question:job.plan.videos[index].question,status:pending?(request.status==='working'?'analyzing':'revision_pending'):last?.decision==='approve'?'approved':last?.decision==='reject'?'revision_pending':'pending',reviews,request:request?.draftHash===fingerprint?request:null,validation:validatePlan(questionPlan(job,index),job.doc,job.client)};
+ return {index,draftHash:fingerprint,question:job.plan.videos[index].question,status:pending?(request.status==='working'?'analyzing':'revision_pending'):last?.decision==='approve'?'approved':last?.decision==='reject'?'revision_pending':'pending',reviews,request:request?.draftHash===fingerprint?request:null,validation:validateForJob(questionPlan(job,index),job.doc,job.client,1)};
 }
 export function approvedQuestion(job,index){
  const state=questionState(job,index);
- if(job.rulesHash!==rulesHash)throw new Error('The content rulebook changed. Review the current question again.');
+ if(job.mode===directMode){if(job.scriptRulesHash!==scriptPolicyHash)throw new Error('The script policy changed. Review the current question again.');}
+ else if(job.rulesHash!==rulesHash)throw new Error('The content rulebook changed. Review the current question again.');
  if(state.status!=='approved')throw new Error('Finish the content review for this question before creating its video.');
  if(state.validation.errors.length)throw new Error('This question has unresolved content checks.');
  const savedAudit=job.questionAudits?.[index],audit=savedAudit?.draftHash===state.draftHash?savedAudit:null;

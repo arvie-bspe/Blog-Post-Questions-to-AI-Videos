@@ -1,6 +1,6 @@
 import {createSign} from 'node:crypto';
 import {config} from './rules.mjs';
-import {normalize,parseMonthly,parseClients,selectClient,inspect} from './domain.mjs';
+import {normalize,parseMonthly,parseClients,selectClient,inspect,inspectDirect,googleId,documentTabs} from './domain.mjs';
 export const googleConfigured=()=>Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON||(process.env.GOOGLE_CLIENT_ID&&process.env.GOOGLE_CLIENT_SECRET&&process.env.GOOGLE_REFRESH_TOKEN));
 const tokenCache=new Map();
 export async function googleToken(write=false){
@@ -21,10 +21,32 @@ export async function googleToken(write=false){
   if(!res.ok)throw new Error(`Google authentication failed (HTTP ${res.status}).`);
   const data=await res.json();tokenCache.set(write,{value:data.access_token,until:Date.now()+(data.expires_in-60)*1000});return data.access_token;
 }
-async function getGoogle(url){
+export async function getGoogle(url){
   const res=await fetch(url,{headers:{Authorization:`Bearer ${await googleToken()}`},signal:AbortSignal.timeout(30000)});
   if(!res.ok)throw new Error(`Google read failed (HTTP ${res.status}). Check document sharing and API access.`);
   return res.json();
+}
+export function directDocumentReference(value){
+  let url;try{url=new URL(value);}catch{throw new Error('Paste a valid Google Doc URL.');}
+  const documentId=googleId(url.href,'document');if(!documentId)throw new Error('Use a Google Docs document URL.');
+  return {documentId,documentUrl:`https://docs.google.com/document/d/${documentId}/edit`,tabId:url.searchParams.get('tab')||null};
+}
+export async function clientProfiles(read=getGoogle){
+  const source=config.sources.clients,values=await read(`https://sheets.googleapis.com/v4/spreadsheets/${source.spreadsheetId}/values/${encodeURIComponent(`'${source.sheetName}'!A1:L100`)}`);
+  return parseClients(values.values);
+}
+export async function directSource(input,{read=getGoogle}={}){
+  const ref=directDocumentReference(input.documentUrl),raw=await read(`https://docs.googleapis.com/v1/documents/${ref.documentId}?includeTabsContent=true`),tabs=documentTabs(raw),tabId=input.tabId||ref.tabId;
+  if(tabs.length>1&&!tabId){const e=new Error('This Google Doc contains multiple tabs. Choose the article tab before continuing.');e.status=409;e.details={tabs};throw e;}
+  let client={key:String(input.clientKey||'Unassigned').trim()||'Unassigned',homepage:String(input.homepage||'').trim(),name:String(input.firmName||'').trim(),address:String(input.address||'').trim(),phone:String(input.phone||'').trim(),attorneys:[],cta:'',disclaimer:'',ctaRequired:false,disclaimerRequired:false};
+  if(input.clientKey){try{client=selectClient(await clientProfiles(read),input.clientKey);}catch(e){if(!input.firmName)throw e;}}
+  for(const key of ['homepage','name','address','phone'])if(String(input[{homepage:'homepage',name:'firmName',address:'address',phone:'phone'}[key]]||'').trim())client[key]=String(input[{homepage:'homepage',name:'firmName',address:'address',phone:'phone'}[key]]).trim();
+  const folderUrl=String(input.folderUrl||'').trim(),pageUrl=String(input.pageUrl||'').trim();
+  if(folderUrl&&!googleId(folderUrl,'folder'))throw new Error('Use a valid Google Drive folder URL for the Visual folder.');
+  if(pageUrl){let target;try{target=new URL(pageUrl);}catch{throw new Error('Use a valid published article URL.');}if(!['https:','http:'].includes(target.protocol))throw new Error('Use an HTTPS or HTTP published article URL.');}
+  const documentUrl=`https://docs.google.com/document/d/${ref.documentId}/edit?tab=${encodeURIComponent(tabId||tabs[0].id)}`;
+  const row={clientKey:client.key,order:'Direct Google Doc',pageUrl,titleHint:raw.title,documentUrl,folderUrl,documentId:ref.documentId,folderId:googleId(folderUrl,'folder'),tabId:tabId||tabs[0].id,issues:[]};
+  return {row,client,doc:inspectDirect(raw,{tabId:row.tabId})};
 }
 export async function liveMonths(read=getGoogle){
   const root=`https://sheets.googleapis.com/v4/spreadsheets/${config.sources.monthly.spreadsheetId}`;

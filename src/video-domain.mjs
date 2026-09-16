@@ -23,8 +23,10 @@ export function prepare(job,body,assetHash){
 const canonical=s=>String(s).normalize('NFKC').replace(/\s+/g,'').toLowerCase();
 export function captions(alignment,script,question,duration){
   if(!Number.isFinite(duration)||duration<=0)throw new Error('The audio duration could not be measured.');
-  const words=alignment.words?.filter(w=>String(w.text).trim());
-  if(!words?.length||canonical(words.map(w=>w.text).join(''))!==canonical(script))throw new Error('Alignment does not match every word of the approved script.');
+  let words=alignment.words?.filter(w=>String(w.text).trim());
+  const comparable=s=>String(s).normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'');
+  if(!words?.length||comparable(words.map(w=>w.text).join(''))!==comparable(script))throw new Error('Alignment does not match every word of the approved script.');
+  const exact=script.trim().split(/\s+/);if(exact.length===words.length)words=words.map((w,i)=>({...w,text:exact[i]}));
   let previous=0,offset=0;const questionEnd=canonical(question).length,cues=[];let cue=null;
   for(const word of words){
     const {start,end}=word;

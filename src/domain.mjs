@@ -56,6 +56,24 @@ export function paragraphsFromGoogle(doc) {
   if(doc.tabs?.length)tabs(doc.tabs);else read(doc.body?.content,'t.0');
   return result;
 }
+export function documentTabs(doc){
+  const result=[];const walk=tabs=>{for(const t of tabs||[]){result.push({id:t.tabProperties?.tabId||'t.0',title:t.tabProperties?.title||doc.title||'Document'});walk(t.childTabs);}};walk(doc.tabs);return result.length?result:[{id:'t.0',title:doc.title||'Document'}];
+}
+export function inspectDirect(doc,{tabId=null}={}){
+  const tabs=documentTabs(doc);if(tabId&&!tabs.some(t=>t.id===tabId))throw new Error('The selected Google Doc tab no longer exists.');
+  const selected=tabId||tabs[0].id;
+  const paragraphs=paragraphsFromGoogle(doc).filter(p=>(!doc.tabs?.length||p.tabId===selected)&&p.text?.trim()).map((p,i)=>({id:`${p.tabId||selected}:${p.startIndex??i}`,text:p.text.trim(),style:p.namedStyleType||'NORMAL_TEXT',tabId:p.tabId||selected}));
+  if(!paragraphs.length)throw new Error('The selected document tab is empty.');
+  if(paragraphs.reduce((n,p)=>n+p.text.length,0)>150000)throw new Error('The selected document tab exceeds the current 150,000-character processing limit. Split the article before analysis.');
+  const title=paragraphs.find(p=>['TITLE','HEADING_1'].includes(p.style))?.text||tabs.find(t=>t.id===selected)?.title||doc.title;
+  const candidates=[];
+  for(let i=0;i<paragraphs.length;i++){
+    const p=paragraphs[i];if(!p.text.endsWith('?')||['TITLE','HEADING_1'].includes(p.style))continue;
+    const paragraphIds=[];for(let j=i+1;j<paragraphs.length;j++){const q=paragraphs[j];if(/^HEADING_[1-6]$/.test(q.style)||q.style==='TITLE')break;if(q.style==='NORMAL_TEXT')paragraphIds.push(q.id);}
+    candidates.push({id:p.id,question:p.text,paragraphIds,selectionKind:/^HEADING_/.test(p.style)?'explicit_source':'explicit_source'});
+  }
+  return {documentId:doc.documentId,title:doc.title,pageTitle:title,revisionId:doc.revisionId||null,selectedTabId:selected,availableTabs:tabs,sourceHash:hash(paragraphs),paragraphs,candidates,excluded:[],questionSelectionMode:'ai_independent'};
+}
 export function inspect(doc,titleHint='',clientKey='') {
   const paragraphs=paragraphsFromGoogle(doc).filter(p=>p.text?.trim()).map((p,i)=>({id:`${p.tabId||'t.0'}:${p.startIndex??i}`,text:p.text.trim(),style:p.namedStyleType||'NORMAL_TEXT',tabId:p.tabId||'t.0'}));
   if(!paragraphs.length)throw new Error('The article is empty.');
@@ -180,5 +198,34 @@ export function validatePlan(plan,doc,client,max=4){
   }
   return {errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
 }
+export function validateDirectPlan(plan,doc,max=4){
+  const errors=[],warnings=[];
+  if(!Array.isArray(plan?.videos)||!Array.isArray(plan?.skipped))return {errors:['Invalid analysis format.'],warnings};
+  if(plan.videos.length>max)errors.push(`Video count exceeds the configured maximum of ${max}.`);
+  if(plan.articleIdentity){const identity=resolveArticleIdentity(doc,plan.articleIdentity);for(const field of ['name','address','phone'])if(plan.articleIdentity[field]&&!identity[field])errors.push(`Article-specific ${field} lacks matching source evidence.`);}
+  const ids=new Set(),questions=new Set(),answers=new Set(),paragraphs=new Map(doc.paragraphs.map(p=>[p.id,p]));
+  for(const v of plan.videos){
+    if(!v||typeof v!=='object'){errors.push('Invalid video entry.');continue;}
+    const id=String(v.candidateId||'Unidentified question'),question=String(v.question||'').trim();
+    if(!question.endsWith('?')||question.length<8||question.length>220)errors.push(`${id}: use a clear question ending in a question mark.`);
+    if(!['explicit_source','formulated_source'].includes(v.selectionKind))errors.push(`${id}: selection kind must identify an explicit or formulated source question.`);
+    if(ids.has(id)||questions.has(normalize(question)))errors.push(`${id}: duplicate question.`);ids.add(id);questions.add(normalize(question));
+    const support=Array.isArray(v.supportingParagraphIds)?v.supportingParagraphIds:[];
+    if(!support.length||support.some(pid=>!paragraphs.has(pid)))errors.push(`${id}: identify supporting article paragraphs for this question.`);
+    if(typeof v.reason!=='string'||v.reason.trim().length<12)errors.push(`${id}: explain briefly why this question is useful for video.`);
+    if(!Array.isArray(v.sentences)||!v.sentences.length){errors.push(`${id}: empty answer.`);continue;}
+    for(const sentence of v.sentences){
+      if(typeof sentence?.text!=='string'||!sentence.text.trim()||!Array.isArray(sentence.evidence)||!sentence.evidence.length){errors.push(`${id}: each sentence needs article evidence.`);continue;}
+      for(const evidence of sentence.evidence){const p=paragraphs.get(evidence?.paragraphId);if(!p||typeof evidence.quote!=='string'||evidence.quote.trim().length<8||!p.text.includes(evidence.quote))errors.push(`${id}: evidence does not match the selected Google Doc tab.`);}
+    }
+    if(v.cta||v.disclaimer)warnings.push(`${id}: review the optional closing wording against the source and client instructions.`);
+    const script=[question,...v.sentences.map(s=>s.text),v.cta,v.disclaimer].filter(Boolean).join(' '),words=script.trim().split(/\s+/).filter(Boolean).length;
+    if(words>90)errors.push(`${id}: the script exceeds the 90-word development limit.`);else if(words>75)warnings.push(`${id}: the script is above the preferred approximately 30-second range.`);
+    const signature=normalize(v.sentences.map(s=>s?.text).join(' '));if(answers.has(signature))errors.push(`${id}: duplicate answer.`);answers.add(signature);
+    if(Array.isArray(v.reviewFlags))warnings.push(...v.reviewFlags.map(f=>`${id}: ${f}`));
+  }
+  return {errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
+}
+export const validateForJob=(plan,doc,client,max=4)=>doc?.questionSelectionMode==='ai_independent'?validateDirectPlan(plan,doc,max):validatePlan(plan,doc,client,max);
 export const identity=(row,doc,mode,rulesHash)=>hash([mode,normalize(row.clientKey),row.documentId,doc.sourceHash,rulesHash]);
 export const recordIdentity=(row,doc,mode,rulesHash,client)=>hash([identity(row,doc,mode,rulesHash),hash(client),row.order,row.folderId]);

@@ -1,4 +1,4 @@
-import {config,rulesHash} from './rules.mjs';
+import {config,rulesHash,appearanceRulesHash} from './rules.mjs';
 import {scriptText} from './video-domain.mjs';
 import {requireArticleIdentity} from './article-identity.mjs';
 import {randomUUID} from 'node:crypto';
@@ -8,6 +8,8 @@ import {prepare} from './heygen-domain.mjs';
 import {choosePresenter,presenterPool} from './presenter-selection.mjs';
 import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
 import {detectorVersion} from './visual-checks.mjs';
+import {queueLocalVideo} from './local-video.mjs';
+import {videoProvider} from './workflow-config.mjs';
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 const topic=question=>question.replace(/[?{}\\<>:\r\n]/g,'').trim().split(/\s+/).slice(0,6).join(' ');
@@ -59,7 +61,8 @@ export class ApprovalVideoAutomation {
     if(matches.some(j=>j.status==='needs_reconciliation'||j.requests?.video?.state==='submitting'&&!j.requests.video.id))throw new Error('This question has an uncertain earlier paid submission. Reconcile it before any replacement.');
     const paid=matches.filter(j=>j.requests?.video?.id);if(!paid.length)return null;
     const compatible=paid.filter(j=>!presenterIssue(j.avatar,j.voice));
-    const current=compatible.find(j=>j.layoutVersion===config.video.layoutVersion&&j.detectorVersion===detectorVersion&&j.source.rulesHash===rulesHash&&hash(j.client)===hash(parent.client)&&hash(j.articleIdentity)===hash(requireArticleIdentity(parent.doc,parent.plan.articleIdentity))&&j.endCard?.targetUrl===parent.row.pageUrl);
+    const expectedRules=parent.mode==='direct_google'?appearanceRulesHash:rulesHash;
+    const current=compatible.find(j=>j.layoutVersion===config.video.layoutVersion&&j.detectorVersion===detectorVersion&&j.source.rulesHash===expectedRules&&hash(j.client)===hash(parent.client)&&hash(j.articleIdentity)===hash(requireArticleIdentity(parent.doc,parent.plan.articleIdentity))&&j.endCard?.targetUrl===parent.row.pageUrl);
     if(current){
       if(current.approvalHash!==approvalHash){
         current.approvalHistory=[...(current.approvalHistory||[]),{approvalHash:current.approvalHash,rulesHash:current.source.rulesHash,reviews:current.reviews,at:now()}];
@@ -81,6 +84,9 @@ export class ApprovalVideoAutomation {
       this.assertProfile(entry.parent,entry.profile.id);
       const parent=service.store.get(entry.parent);if(approved(parent,entry.index)!==entry.approvalHash)throw new Error('This question or its review changed. A new individual approval is required.');
       await service.checkFresh(parent,entry.index);entry.status='working';entry.error=null;this.save(entry);
+      if(parent.mode==='direct_google'&&videoProvider(service.env)==='local_worker'){
+        const local=await queueLocalVideo(service,parent,entry.index,entry.triggeredBy);entry.videos=[local.id];entry.selection={avatar:local.avatar,voice:local.voice,selection:{method:'approved_local_assets'}};entry.status='submitted';entry.error=null;this.save(entry);return;
+      }
       const prior=await this.reuse(parent,entry.index,entry.approvalHash);
       if(prior){entry.videos=[prior.id];entry.reusedExisting=true;const held=['needs_attention','needs_reconciliation','failed','paused','changes_requested'].includes(prior.status);entry.status=held?'blocked':'submitted';entry.error=held?(prior.error||'The saved video needs attention. No replacement was purchased.'):null;this.save(entry);return;}
       if(!service.env.HEYGEN_API_KEY)throw new Error('HEYGEN_API_KEY is missing. Add it privately in Railway; this question approval can continue afterward.');

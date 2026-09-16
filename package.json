@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env src/server.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "worker": "node --env-file-if-exists=.env.worker worker/studio-worker.mjs"
   },
   "dependencies": {
     "playwright": "1.63.0"

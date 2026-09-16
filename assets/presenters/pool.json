@@ -4,6 +4,14 @@
   "verifiedAt": "2026-09-16",
   "avatars": [
     {
+      "id": "local-studio-presenter-01",
+      "name": "Local Studio Presenter 01",
+      "gender": "male",
+      "type": "local_image",
+      "personKey": "Local Studio Presenter 01",
+      "asset": "assets/presenters/studio-presenter-01.png"
+    },
+    {
       "id": "Brandon_Business_Sitting_Front_public",
       "name": "Brandon Business Sitting Front",
       "gender": "male",
@@ -27,22 +35,32 @@
   ],
   "voices": [
     {
+      "id": "am_michael",
+      "name": "Michael - Local US English",
+      "language": "English",
+      "gender": "male",
+      "type": "local_tts"
+    },
+    {
       "id": "00e3d285aba44b27a83c47c02c9c2d9c",
       "name": "Orson - Firm & Measured",
       "language": "English",
-      "gender": "male"
+      "gender": "male",
+      "type": "heygen_voice"
     },
     {
       "id": "6567750df960424fb6556202d7206640",
       "name": "Renata - Clear & Professional",
       "language": "English",
-      "gender": "female"
+      "gender": "female",
+      "type": "heygen_voice"
     },
     {
       "id": "02052ba42f3d4d50a809b964bb8b1b94",
       "name": "Davor - Firm & Measured",
       "language": "English",
-      "gender": "male"
+      "gender": "male",
+      "type": "heygen_voice"
     }
   ],
   "metadataSource": "HeyGen public API catalog, verified September 16, 2026"

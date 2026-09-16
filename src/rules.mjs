@@ -6,6 +6,8 @@ export const rulesHash=hash(rules);
 if(rulesHash!==config.rules.sha256)throw new Error('Global rules checksum changed. Reconcile the configuration before running.');
 const section=(start,end)=>rules.slice(rules.indexOf(start),rules.indexOf(end));
 export const globalContent=section('### C01','### C32')+section('### C33','## Complete video appearance');
+export const appearanceRules=rules.slice(rules.indexOf('## Complete video appearance'));
+export const appearanceRulesHash=hash(appearanceRules);
 export function clientRules(key){
   const scope=section('### C32','### C33');
   const names=['Davies','John','Dan','Alia','Ticket Crushers','Gibson and Singleton','Russell Chicago'];

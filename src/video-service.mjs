@@ -11,13 +11,15 @@ import {HeyGen,providerId} from './heygen.mjs';
 import {mediaTools,durationOf,compose} from './media.mjs';
 import {layoutVersion,detectorVersion} from './visual-checks.mjs';
 import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
+import {applyLocalVideoTask} from './local-video.mjs';
+import {videoProvider} from './workflow-config.mjs';
 const error=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
-export const publicJob=j=>{if(!j)return j;const {requests,identity,...rest}=j;return {...rest,presenterIssue:j.provider==='heygen'?presenterIssue(j.avatar,j.voice):null,provider:j.provider||'fal.ai',legacy:j.provider!=='heygen',requests:Object.fromEntries(Object.entries(requests||{}).map(([stage,r])=>[stage,{id:r.id||null,state:r.state,submittedAt:r.submittedAt||null}]))};};
+export const publicJob=j=>{if(!j)return j;const {requests,identity,...rest}=j;return {...rest,presenterIssue:['heygen','local_worker'].includes(j.provider)?presenterIssue(j.avatar,j.voice):null,provider:j.provider||'fal.ai',legacy:!['heygen','local_worker'].includes(j.provider),requests:Object.fromEntries(Object.entries(requests||{}).map(([stage,r])=>[stage,{id:r.id||null,state:r.state,submittedAt:r.submittedAt||null}]))};};
 const fileTypes={'logo.png':'image/png','voice.wav':'audio/wav','final.mp4':'video/mp4','presenter.mp4':'video/mp4','thumbnail.png':'image/png','captions.vtt':'text/vtt; charset=utf-8','manifest.json':'application/json; charset=utf-8'};
 export class VideoService {
-  constructor({store,env,dataDir,checkFresh,local,heygen,media,logos,delivery,onScriptChanges}){
-    Object.assign(this,{store,env,dataDir,checkFresh,local});this.db=store.db;this.media=media||mediaTools(env);this.heygen=heygen||new HeyGen(()=>env.HEYGEN_API_KEY);this.active=new Set();this.closed=false;this.avatars=new Map();this.voices=new Map();this.pages=new Map();
+  constructor({store,env,dataDir,checkFresh,local,heygen,media,logos,delivery,onScriptChanges,tasks}){
+    Object.assign(this,{store,env,dataDir,checkFresh,local,tasks});this.db=store.db;this.media=media||mediaTools(env);this.compose=compose;this.heygen=heygen||new HeyGen(()=>env.HEYGEN_API_KEY);this.active=new Set();this.closed=false;this.avatars=new Map();this.voices=new Map();this.pages=new Map();
     this.db.exec('CREATE TABLE IF NOT EXISTS videos(id TEXT PRIMARY KEY, identity TEXT UNIQUE NOT NULL, parent TEXT NOT NULL, updated TEXT NOT NULL, payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS video_spend(day TEXT, stage TEXT, count INTEGER, PRIMARY KEY(day,stage));');
     for(const j of this.list())if(j.provider==='heygen'&&['working','compositing'].includes(j.status)){
       j.status=Object.values(j.requests).some(r=>r.state==='submitting'&&!r.id)?'needs_reconciliation':'paused';
@@ -32,7 +34,7 @@ export class VideoService {
   get(id){const r=this.db.prepare('SELECT payload FROM videos WHERE id=?').get(id);return r?JSON.parse(r.payload):error('Video record not found.',404);}
   save(j){j.updated=now();this.db.prepare('INSERT INTO videos VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated,payload=excluded.payload').run(j.id,j.identity,j.parentId,j.updated,JSON.stringify(j));return j;}
   directory(j){const dir=join(this.dataDir,'videos',j.id);mkdirSync(dir,{recursive:true});return dir;}
-  async catalog(){await this.ready;return {backend:'HeyGen',configured:Boolean(this.env.HEYGEN_API_KEY),ffmpeg:this.mediaReady,prices,targetSeconds:30,nativeResolution:'1080p',outputResolution:'1080 × 1920',aspectRatio:'9:16',layoutVersion,detectorVersion,endCardSeconds:3,logoRequired:true,presenterMode:'HeyGen Studio Avatar',dailyLimit:Number(this.env.DAILY_VIDEO_LIMIT||2)};}
+  async catalog(){await this.ready;const provider=videoProvider(this.env),local=provider==='local_worker';return {backend:local?'Local worker · Kokoro + SadTalker':'HeyGen',provider,configured:local?Boolean(this.env.STUDIO_WORKER_TOKEN):Boolean(this.env.HEYGEN_API_KEY),ffmpeg:this.mediaReady,prices:local?{currency:'USD',providerCharge:0}:prices,targetSeconds:30,nativeResolution:local?'Worker generated':'1080p',outputResolution:'1080 × 1920',aspectRatio:'9:16',layoutVersion,detectorVersion,endCardSeconds:3,logoRequired:true,presenterMode:local?'Approved local presenter image':'HeyGen Studio Avatar',dailyLimit:local?null:Number(this.env.DAILY_VIDEO_LIMIT||2)};}
   async library(kind,type='studio_avatar',token=''){
     if(!['avatars','voices'].includes(kind)||type!=='studio_avatar'||typeof token!=='string'||token.length>2048)error('Use the Studio Avatar library; Photo Avatars are disabled.');
     if(!this.env.HEYGEN_API_KEY)error('Add HEYGEN_API_KEY privately in Railway Variables to load presenters and voices.');
@@ -58,13 +60,15 @@ export class VideoService {
     if(this.pages.size>100)this.pages.clear();this.pages.set(key,{page,expires:Date.now()+300000});return page;
   }
   async validate(j){
-    if(j.provider!=='heygen')error('This is a saved fal.ai setup. Prepare a new HeyGen setup above; the old record is kept for history.',409);
+    if(!j.provider)error('This is a saved fal.ai setup. Prepare a new video from the current approved script; the old record is kept for history.',409);
+    if(!['heygen','local_worker'].includes(j.provider))error('This is a saved legacy setup. Prepare a new video from the current approved script; the old record is kept for history.',409);
     if(j.layoutVersion!==layoutVersion)error('This video uses the previous layout. Rebuild it with Macy’s updated layout before review or delivery.',409);
     matchingPresenter(j.avatar,j.voice);
     if(j.files?.video&&j.detectorVersion!==detectorVersion)error('Rebuild this saved footage with the current framing checks before Macy review or delivery. No new HeyGen render is needed.',409);
     const parent=this.store.get(j.parentId);if(approved(parent,j.index)!==j.approvalHash)error('The source or script review changed. Prepare from the current approved version.',409);
     await this.checkFresh(parent,j.index);if(approved(this.store.get(j.parentId),j.index)!==j.approvalHash)error('The content review changed during this request.',409);
   }
+  async applyWorkerTask(task){return applyLocalVideoTask(this,task);}
   consume(){
     const limit=Number(this.env.DAILY_VIDEO_LIMIT||2);if(!Number.isInteger(limit)||limit<1||limit>20)error('DAILY_VIDEO_LIMIT must be an integer from 1 to 20.');
     const day=now().slice(0,10);this.db.prepare('INSERT INTO video_spend(day,stage,count) VALUES(?,?,1) ON CONFLICT(day,stage) DO UPDATE SET count=count+1 WHERE count<?').run(day,'heygen_render',limit);

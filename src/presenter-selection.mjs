@@ -4,7 +4,9 @@ import {presenterPool} from './presenter-compatibility.mjs';
 export {presenterPool};
 export function choosePresenter(parent,index,history=[],reserved=[],pool=presenterPool){
  const gender=presenterGender(parent.doc,parent.plan?.presenterContext);
- const eligible=pool.avatars.filter(a=>(!gender||a.gender===gender)&&a.gender&&pool.voices.some(v=>v.gender===a.gender));
+ // HeyGen automation must never receive a local presenter image. The local
+ // renderer selects its own image/voice pair in local-video.mjs.
+ const eligible=pool.avatars.filter(a=>a.type==='studio_avatar'&&(!gender||a.gender===gender)&&a.gender&&pool.voices.some(v=>v.type!=='local_tts'&&v.gender===a.gender));
  if(!eligible.length)throw new Error('No approved generic presenter matches the explicit lawyer-blurb information.');
  const family=a=>a.personKey||a.id;
  const recent=history.filter(j=>normalize(j.client?.key)===normalize(parent.client.key)&&j.requests?.video?.id);
@@ -13,7 +15,7 @@ export function choosePresenter(parent,index,history=[],reserved=[],pool=present
  eligible.sort((a,b)=>use(a)-use(b)||lastUsed(a)-lastUsed(b)||hash([parent.id,index,a.id]).localeCompare(hash([parent.id,index,b.id])));
  const avatar=eligible[0];
  // Vary within a compatible gender pool, without a permanent avatar/voice assignment.
- const voices=pool.voices.filter(v=>v.gender===avatar.gender);
+ const voices=pool.voices.filter(v=>v.type!=='local_tts'&&v.gender===avatar.gender);
  const voice=voices[parseInt(hash([parent.id,index,'voice']).slice(0,8),16)%voices.length];
  if(!voice)throw new Error('An approved voice pool is required.');
  return {avatar:{...avatar},voice:{...voice},selection:{method:'automatic_curated_pool',poolVersion:pool.version,genderRequirement:gender||'unspecified',lawyerBlurbParagraphIds:parent.plan?.presenterContext?.lawyerBlurbParagraphIds||[],variation:eligible.length===1?'Only one eligible presenter; reuse permitted.':'Unused in batch, then least recently used for this client.'}};
