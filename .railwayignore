@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.git/
+data/
+fixtures/
+vendor/
+test-results/
+node_modules/
+*.log
+.env.tmp
+bootstrap/*.sqlite*

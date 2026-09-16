@@ -1,0 +1,218 @@
+{
+  "version": "1.4.2",
+  "status": "active_replacement",
+  "verifiedAt": "2026-09-16",
+  "rules": {
+    "contentSections": 36,
+    "appearanceSections": 100,
+    "master": "GLOBAL_RULES.md",
+    "sha256": "384bfd991956eba3eb39d3c8bfb7ad68c5cf0a11d078480e0344c42d6c7d4bdc",
+    "visualOnlyFromHashes": [
+      "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd"
+    ],
+    "perQuestionMigrationFromHashes": [
+      "deea6ce91ea2cadd559a6b49e9ad02dca60fcbb5537b72cb0283317ee37e4b36"
+    ],
+    "videoCompatibleFromHashes": [
+      "deea6ce91ea2cadd559a6b49e9ad02dca60fcbb5537b72cb0283317ee37e4b36",
+      "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd"
+    ]
+  },
+  "sources": {
+    "monthly": {
+      "spreadsheetId": "1BJ34XkaONgre7fJfyX2tfw0VwJQcZZvNDcxKcWaEDes",
+      "initialSheetId": 1680274981,
+      "initialSheetName": "September 2026",
+      "columns": {
+        "client": "A",
+        "order": "B",
+        "pageUrl": "E",
+        "context": "F",
+        "taskId": "H",
+        "taskUrl": "I",
+        "article": "J",
+        "visualFolder": "L"
+      },
+      "otherMonthsRequireMapping": true,
+      "verifiedSheets": [
+        {
+          "sheetId": 1680274981,
+          "title": "September 2026"
+        },
+        {
+          "sheetId": 1167055472,
+          "title": "August 2026"
+        }
+      ],
+      "mappingVerifiedAt": "2026-09-14T17:01:13Z"
+    },
+    "clients": {
+      "spreadsheetId": "1UUvP_99OWT90lVPpoo_Y2mLS2Ubl6wiEYDrRwrs9-cA",
+      "sheetName": "Sheet1",
+      "headerRows": 2,
+      "columns": {
+        "clientKey": "A",
+        "firmName": "D",
+        "attorneyNames": [
+          "F",
+          "G",
+          "H"
+        ],
+        "address": "J",
+        "phone": "K"
+      }
+    },
+    "content": {
+      "documentId": "1WSvU3_FJYC_tl7hOHpVYM4L_5rhofNLD8X6F8cHyosQ",
+      "revisionId": "ANLCKQnllTqBuJ8Hu_Ij4QU7BxyWRxG2paAmtJjyxKxDTl3DaJJfYpW8VNhE0ezgckDbESeOYCYIrFJP1HPYiNsgPC1f7Y-pDQVDYpPoBOE",
+      "verifiedAt": "2026-09-16"
+    },
+    "appearance": {
+      "documentId": "1pSiCC_mkD1rieKF08kLFJhIG9NaGoUGPmw_EqhkPDWU",
+      "revisionId": "ANLCKQlwdTlycbkK8WL6m8Jvmxf3JKBX2BA3Hgdjbf0Udu_6xJobr5PfGbRAOEEpE52Zbj263gQ7sPs4YG6HPGYlYVR_URDRN2e-dbP7QXs",
+      "verifiedAt": "2026-09-16"
+    }
+  },
+  "content": {
+    "targetVideos": 2,
+    "defaultMaximumVideos": 4,
+    "higherMaximumRequiresExplicitConfiguration": true,
+    "allowZero": true,
+    "targetSeconds": {
+      "preferred": 30,
+      "isHardLimit": false,
+      "excessRequiresAccuracyReason": true
+    },
+    "eligibleQuestions": "main_body_h2_h3_above_faq_or_independently_supported_faq",
+    "excludeTitle": true,
+    "excludeH1": true,
+    "allowImpliedQuestions": false,
+    "factualSource": "approved_article_only",
+    "contactSource": "approved_source_article_with_evidence",
+    "clientRulesScope": "exact_client_only",
+    "conditionalTermsRequireContextReview": true,
+    "alternateQuestionClients": [
+      "Russell Chicago"
+    ],
+    "excludeLawyerHiringQuestions": true
+  },
+  "video": {
+    "aspectRatio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": null,
+    "presenterType": "heygen_studio_avatar",
+    "preservePresenterOnRegeneration": true,
+    "voiceProvider": "heygen",
+    "approvedVoiceIds": [],
+    "automaticVoiceFallback": null,
+    "preserveVoiceOnRegeneration": true,
+    "speechMustMatchApprovedScript": true,
+    "timingSource": "actual_generated_audio",
+    "titleCaptionCase": "natural",
+    "answerCaptionCase": "natural",
+    "brandingPosition": "upper_right",
+    "persistentBranding": true,
+    "backgroundMusic": false,
+    "outro": true,
+    "endCard": true,
+    "thumbnailRequired": true,
+    "technicalQARequired": true,
+    "visualQARequired": true,
+    "testBranding": {
+      "logoEnabled": true,
+      "brandColorsEnabled": false,
+      "styling": "neutral",
+      "deferredUntil": "brand_colors_only",
+      "source": "Arvie portrait and logo test workflow, September 15, 2026"
+    },
+    "photoAvatarsEnabled": false,
+    "logoAcquisition": {
+      "source": "selected_firm_homepage_html",
+      "cache": "persistent_volume_by_domain",
+      "svgRasterizer": "headless_chromium_via_playwright",
+      "implementationStatus": "implemented_google_authorization_separate"
+    },
+    "layoutVersion": "two-state-2026-09-16",
+    "mainSceneFit": "cover_crop",
+    "mainSceneCoverage": 1,
+    "mainSceneContactFields": false,
+    "logoMaximumWidth": 0.38,
+    "logoMaximumHeight": 0.2,
+    "logoTop": 0.04,
+    "logoRight": 0.04,
+    "maximumCaptionLines": 2,
+    "endCardSeconds": 3,
+    "endCardBackground": "#FFFFFF",
+    "endCardFieldOrder": [
+      "name",
+      "address",
+      "phone",
+      "targetUrl"
+    ],
+    "endCardTargetUrlSource": "monthly_page_url_column_E",
+    "endCardTransition": "hard_cut",
+    "thumbnailStyle": "actual_presenter_with_short_topic",
+    "logoPreferredWidth": 0.35,
+    "captionFontSize": 62,
+    "captionColor": "#FFFFFF",
+    "captionBackground": "#000000",
+    "captionPreferredWidth": 0.75,
+    "captionMaximumWidth": 0.84,
+    "automaticSelection": true,
+    "endCardLogo": true,
+    "avatarVoiceGenderMatchRequired": true,
+    "unknownGenderAction": "hold_before_paid_submission",
+    "faceDetectorVersion": "yunet-2023mar-1"
+  },
+  "workflow": {
+    "approvalTaskTitle": "send for approval to client",
+    "doneMeaning": "client_approved",
+    "eligibleOrders": [
+      "New Page",
+      "New Blog Post",
+      "Re-Write",
+      "Boost Post",
+      "Rewrite-URL Change"
+    ],
+    "orderAliases": {
+      "Rewrite - URL Change": "Rewrite-URL Change"
+    },
+    "automaticTriggersEnabled": false,
+    "delivery": "Visual Google Drive folder",
+    "youtubePublishingEnabled": false,
+    "testTaskMappings": [
+      {
+        "clientKey": "Paul",
+        "documentId": "1RfWvTnDCSqHHo3pW_w8hbMV85hjpMrNiYapqxteBKVQ",
+        "taskId": "z90hj2zccq",
+        "workspaceId": "14138198",
+        "url": "https://app.clickup.com/t/14138198/z90hj2zccq",
+        "verification": "pending"
+      }
+    ],
+    "approvalChecksEnabled": false,
+    "startMode": "manual",
+    "clickupIntegration": "deferred",
+    "videoTrigger": "individual_question_approval",
+    "futureRowTrigger": "kristian_social_poster_handoff",
+    "automaticVideoRequiresConfiguredProfile": false,
+    "scriptChanges": "openai_rewrite_or_visible_manual_revision",
+    "videoChanges": "layout_recomposition_or_explicit_paid_render_or_content_revision",
+    "deliveryTrigger": "macy_approval",
+    "liveInspectionStartsAnalysis": true,
+    "automaticVideoSelection": "codex_curated_pool",
+    "automaticEstimateLimit": 2,
+    "approvalScope": "per_question",
+    "articleWideApprovalEnabled": false
+  },
+  "configurationRequired": [
+    "service_credentials",
+    "google_authorization"
+  ],
+  "deferredConfiguration": [
+    "approved_brand_colors",
+    "clickup_approval_mapping",
+    "clickup_credentials"
+  ]
+}

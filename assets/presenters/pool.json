@@ -1,0 +1,49 @@
+{
+  "version": "2026-09-16-matching-gender",
+  "selectedBy": "Codex at Arvie request",
+  "verifiedAt": "2026-09-16",
+  "avatars": [
+    {
+      "id": "Brandon_Business_Sitting_Front_public",
+      "name": "Brandon Business Sitting Front",
+      "gender": "male",
+      "type": "studio_avatar",
+      "personKey": "Brandon"
+    },
+    {
+      "id": "Caroline_Business_Sitting_Front_public",
+      "name": "Caroline Business Sitting Front",
+      "gender": "female",
+      "type": "studio_avatar",
+      "personKey": "Caroline"
+    },
+    {
+      "id": "Annie_Office_Sitting_Front_public",
+      "name": "Annie Office Sitting Front",
+      "gender": "female",
+      "type": "studio_avatar",
+      "personKey": "Annie"
+    }
+  ],
+  "voices": [
+    {
+      "id": "00e3d285aba44b27a83c47c02c9c2d9c",
+      "name": "Orson - Firm & Measured",
+      "language": "English",
+      "gender": "male"
+    },
+    {
+      "id": "6567750df960424fb6556202d7206640",
+      "name": "Renata - Clear & Professional",
+      "language": "English",
+      "gender": "female"
+    },
+    {
+      "id": "02052ba42f3d4d50a809b964bb8b1b94",
+      "name": "Davor - Firm & Measured",
+      "language": "English",
+      "gender": "male"
+    }
+  ],
+  "metadataSource": "HeyGen public API catalog, verified September 16, 2026"
+}

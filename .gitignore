@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+data/
+node_modules/
+*.log
+test-results/
+fixtures/
+
+vendor/
+.env.tmp
+bootstrap/*.sqlite*
+bootstrap/*.json
+__pycache__/
+*.pyc
+.railway/
