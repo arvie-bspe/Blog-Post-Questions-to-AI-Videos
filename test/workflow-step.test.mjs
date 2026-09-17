@@ -1,13 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {inspect,parseClients} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {rulesHash} from '../src/rules.mjs';
 import {questionState,recordQuestionReview} from '../src/question-approval.mjs';
 import {workflowStep} from '../src/workflow-step.mjs';
 
-const fixture=name=>JSON.parse(readFileSync(new URL('../fixtures/'+name+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 const job=()=>{const doc=inspect(fixture('paul'));return {id:'step-test',identity:'step-test',doc,client:parseClients(fixture('clients'))[0],plan:preparedExample(doc),mode:'saved_snapshot',rulesHash,origin:'Manual draft',status:'content_review',reviews:[]};};
 
 test('current step reports mixed per-question progress instead of an article-wide approval',()=>{

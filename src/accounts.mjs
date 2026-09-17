@@ -58,7 +58,11 @@ export class AccountStore{
   list(){return this.db.prepare('SELECT * FROM accounts WHERE active=1 ORDER BY role,name COLLATE NOCASE').all().map(publicAccount);}
   get(id){return publicAccount(this.db.prepare('SELECT * FROM accounts WHERE id=? AND active=1').get(id));}
   row(id){return this.db.prepare('SELECT * FROM accounts WHERE id=? AND active=1').get(id)||null;}
-  find(identifier){const value=normalize(identifier);if(!value)return null;return this.db.prepare('SELECT * FROM accounts WHERE active=1 AND (lower(login)=? OR lower(email)=? OR lower(name)=?)').get(value,value,value)||null;}
+  conflicts(values,excludeId=null){
+    const wanted=new Set(values.map(normalize).filter(Boolean));if(!wanted.size)return [];
+    return this.db.prepare('SELECT * FROM accounts WHERE active=1 AND (? IS NULL OR id<>?)').all(excludeId,excludeId).filter(row=>[row.login,row.email,row.name].some(value=>wanted.has(normalize(value))));
+  }
+  find(identifier){const value=normalize(identifier);if(!value)return null;const rows=this.db.prepare('SELECT * FROM accounts WHERE active=1 AND (lower(login)=? OR lower(email)=? OR lower(name)=?)').all(value,value,value),unique=[...new Map(rows.map(row=>[row.id,row])).values()];return unique.length===1?unique[0]:null;}
   verify(row,password){if(!row)return false;const expected=Buffer.from(row.password_hash,'base64'),actual=scryptSync(String(password||''),Buffer.from(row.password_salt,'base64'),expected.length);return expected.length===actual.length&&timingSafeEqual(expected,actual);}
   authenticate(identifier,password){const row=this.find(identifier);return this.verify(row,password)?publicAccount(row):null;}
   create(input,actorId){
@@ -67,6 +71,7 @@ export class AccountStore{
     if(name.length<2||name.length>80)fail('Enter a name between 2 and 80 characters.');
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)fail('Enter a valid email address.');
     if(slackId.length>64)fail('Slack member IDs must be 64 characters or fewer.');
+    if(this.conflicts([name,email]).length)fail('That name or email conflicts with an existing sign-in identifier.',409);
     const parts=passwordParts(password),id=randomUUID(),at=now();
     try{this.db.prepare('INSERT INTO accounts(id,name,email,login,role,slack_id,password_salt,password_hash,session_version,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,1,?,?)').run(id,name,email,email,role,slackId||null,parts.salt,parts.hash,at,at);}catch(error){if(/UNIQUE/i.test(error.message))fail('That name or email already belongs to an account.',409);throw error;}
     this.event(actorId,id,'create_account');return this.get(id);

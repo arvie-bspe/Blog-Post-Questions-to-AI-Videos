@@ -27,7 +27,7 @@ test('API rejects incomplete/refused output without accepting a draft',async()=>
   }finally{if(old===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=old;}
 });
 test('local pilot inspect, example, review, permissions, failures, and exports',async()=>{
-  const dir=mkdtempSync(join(tmpdir(),'video-http-')),app=createApp({HOST:'127.0.0.1',PORT:'4173',APP_ORIGIN:'http://127.0.0.1:4173',DATA_DIR:dir});
+  const dir=mkdtempSync(join(tmpdir(),'video-http-')),app=createApp({HOST:'127.0.0.1',PORT:'4173',APP_ORIGIN:'http://127.0.0.1:4173',DATA_DIR:dir,SYNTHETIC_TEST_FIXTURES:'true'});
   app.server.listen(0,'127.0.0.1');await once(app.server,'listening');const root=`http://127.0.0.1:${app.server.address().port}`;
   const request=(path,body,actor='Arvie',origin='http://127.0.0.1:4173')=>new Promise((resolve,reject)=>{
     const req=httpRequest(root+'/api/'+path,{method:body===undefined?'GET':'POST',headers:{Host:'127.0.0.1:4173',Origin:origin,'Content-Type':'application/json','X-Reviewer':actor}},res=>{let text='';res.on('data',chunk=>text+=chunk);res.on('end',()=>{try{resolve({status:res.statusCode,body:JSON.parse(text)});}catch(e){reject(e);}});});req.on('error',reject);req.end(body===undefined?undefined:JSON.stringify(body));
@@ -43,7 +43,7 @@ test('local pilot inspect, example, review, permissions, failures, and exports',
     job=(await request(`jobs/${job.id}/example`,{})).body;assert.equal(job.plan.videos.length,2);
     assert.equal((await request(`jobs/${job.id}/example`,{})).status,409);
     assert.equal((await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Source reviewed carefully.'},'Keziah')).status,400);
-    job=(await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Automated QA exercise only. A team member must do the actual source review.',checkedEvidence:true},'Macy')).body;
+    const approval=await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Automated QA exercise only. A team member must do the actual source review.',checkedEvidence:true},'Macy');assert.equal(approval.status,200,approval.body.error);job=approval.body;
     assert.equal(job.status,'partially_reviewed');assert.equal(job.questionStates[1].status,'pending');assert.equal(job.reviews[0].testOnly,true);assert.equal(job.reviews[0].authenticated,false);
     const settings={index:0,avatarId:'unknown-presenter',voiceId:'unknown-voice',presenterAccepted:true,thumbnailTitle:'Support Letters for Your Appeal'};
     const video=await request(`jobs/${job.id}/videos`,settings,'Macy');

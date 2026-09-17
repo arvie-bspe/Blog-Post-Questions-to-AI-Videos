@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {inspect,parseClients,parseMonthly,validatePlan,recordIdentity} from '../src/domain.mjs';
@@ -8,7 +8,7 @@ import {rulesHash,config,rules,clientRules} from '../src/rules.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {Store} from '../src/store.mjs';
 import {reconcileRules} from '../src/rules-migration.mjs';
-const fixture=n=>JSON.parse(readFileSync(new URL('../fixtures/'+n+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 test('all source sections, Russell-only rules and required logo acquisition survive synchronization',()=>{
   assert.equal(config.version,'1.4.2');assert.equal(config.workflow.approvalScope,'per_question');assert.equal([...rules.matchAll(/^### C\d{2} /gm)].length,36);
   assert.equal([...rules.matchAll(/^#### C32\.\d /gm)].length,7);assert.equal([...rules.matchAll(/^### V\d{2,3} /gm)].length,100);

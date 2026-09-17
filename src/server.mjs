@@ -19,19 +19,19 @@ import {importSavedReviews} from './saved-reviews.mjs';
 import {resolveArticleIdentity} from './article-identity.mjs';
 import {approved} from './video-domain.mjs';
 import {adoptSourceIdentity} from './source-records.mjs';
-import {questionState,questionHash,recordQuestionReview} from './question-approval.mjs';
+import {questionState,questionHash,recordQuestionReview,assertSourceAudit} from './question-approval.mjs';
 import {presenterIssue} from './presenter-compatibility.mjs';
 import {TaskQueue} from './task-queue.mjs';
 import {DirectAIResolver} from './direct-ai.mjs';
 import {directMode,directSetupIssues,scriptPolicyHash,scriptPolicyVersion,workflowVersion,aiProvider,videoProvider,isWorkerVideoProvider,workerConfigured} from './workflow-config.mjs';
 import {workflowStep} from './workflow-step.mjs';
+import {syntheticFixture} from './synthetic-fixtures.mjs';
 const file=path=>readFileSync(new URL(path,import.meta.url),'utf8');
-const fixture=name=>{try{return JSON.parse(file('../fixtures/'+name+'.json'));}catch(e){if(e.code==='ENOENT')return null;throw e;}};
-const fixtures=Object.fromEntries(['paul','roman'].map(name=>[name,fixture(name)]).filter(([,doc])=>doc));
-const monthly=fixture('monthly'),directory=fixture('clients');
-const rows=monthly?parseMonthly(monthly):[],clients=directory?parseClients(directory):[];
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const brief=j=>({id:j.id,status:j.status,title:j.doc.pageTitle,client:j.client.key,mode:j.mode,origin:j.origin||null,updated:j.updated,videoCount:j.plan?.videos.length||0,workerTasks:j.workerTasks||[]});
+export function isCurrentVideo(video,parent,provider){
+  try{const expected=isWorkerVideoProvider(video.provider)||parent.mode===directMode?appearanceRulesHash:rulesHash,active=['prepared','working','compositing','visual_review','delivery_pending','delivered','revision_pending','paused','needs_attention','needs_reconciliation','failed'].includes(video.status);return active&&video.provider===provider&&!presenterIssue(video.avatar,video.voice)&&(!video.files?.video||video.detectorVersion===config.video.faceDetectorVersion)&&video.layoutVersion===config.video.layoutVersion&&video.source?.rulesHash===expected&&video.approvalHash===approved(parent,video.index);}catch{return false;}
+}
 export function markdown(job){
   let out=`# ${job.doc.pageTitle}\n\nManual pilot · ${job.mode} · ${job.origin||'Source inspection'}\n\nStatus: ${job.status}. This is not a client approval or finished video.\n\nSource: ${job.row.documentUrl}\n\nRules: ${job.rulesVersion}\nSource hash: ${job.doc.sourceHash}\nCaptured: ${job.created}\n\n`;
   for(const [i,v]of(job.plan?.videos||[]).entries()){
@@ -45,6 +45,9 @@ export function markdown(job){
   return out;
 }
 export function createApp(env=process.env){
+  const fixture=name=>{if(env.SYNTHETIC_TEST_FIXTURES==='true')return syntheticFixture(name);try{return JSON.parse(file('../fixtures/'+name+'.json'));}catch(e){if(e.code==='ENOENT')return null;throw e;}};
+  const fixtures=Object.fromEntries(['paul','roman'].map(name=>[name,fixture(name)]).filter(([,doc])=>doc));
+  const monthly=fixture('monthly'),directory=fixture('clients'),rows=monthly?parseMonthly(monthly):[],clients=directory?parseClients(directory):[];
   const dataDir=resolve(env.DATA_DIR||'./data');mkdirSync(dataDir,{recursive:true});
   initializeDatabase(env,dataDir);
   const store=new Store(resolve(dataDir,'studio.sqlite'));
@@ -54,7 +57,7 @@ export function createApp(env=process.env){
   const send=(res,status,value,type='application/json; charset=utf-8')=>{if(type.startsWith('application/json')&&value?.plan?.videos)value={...value,questionStates:value.plan.videos.map((_,i)=>questionState(value,i))};res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'Referrer-Policy':'no-referrer'});res.end(type.startsWith('application/json')?JSON.stringify(value):value);};
   const json=async(req,max=32768)=>{if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']||''))fail('JSON body required.',415);let text='';for await(const chunk of req){text+=chunk;if(Buffer.byteLength(text)>max)fail('Request is too large.',413);}try{return JSON.parse(text);}catch{fail('Invalid JSON.');}};
   const load=id=>store.get(id)||fail('Review record not found.',404);
-  const currentVideo=v=>{try{const parent=store.get(v.parentId),expected=isWorkerVideoProvider(v.provider)||parent.mode===directMode?appearanceRulesHash:rulesHash,active=['prepared','working','compositing','visual_review','delivery_pending','delivered'].includes(v.status);return active&&v.provider===videoProvider(env)&&!presenterIssue(v.avatar,v.voice)&&(!v.files?.video||v.detectorVersion===config.video.faceDetectorVersion)&&v.layoutVersion===config.video.layoutVersion&&v.source?.rulesHash===expected&&v.approvalHash===approved(parent,v.index);}catch{return false;}};
+  const currentVideo=v=>isCurrentVideo(v,store.get(v.parentId),videoProvider(env));
   const assertCurrent=job=>{if(load(job.id).revision!==job.revision)fail('This record changed in another request. Reload before continuing.',409);};
   async function checkFresh(job,index){
     if(job.mode===directMode){
@@ -76,6 +79,8 @@ export function createApp(env=process.env){
   scripts.recoverPendingTasks();
   const video=new VideoService({store,env,dataDir,checkFresh,local:security.local,tasks,onScriptChanges:(id,note,index)=>scripts.start(id,note,index)});
   tasks.onComplete=async task=>task.type==='ai_codex'?scripts.applyTask(task):['media_local','media_liteavatar'].includes(task.type)?video.applyWorkerTask(task):undefined;
+  tasks.onFailure=task=>task.type==='ai_codex'?scripts.failTask(task):['media_local','media_liteavatar'].includes(task.type)?video.failWorkerTask(task):undefined;
+  tasks.reconcileFailures();
   queueMicrotask(async()=>{for(const r of store.db.prepare("SELECT id FROM worker_tasks WHERE status='completed' AND applied_at IS NULL ORDER BY created").all())try{await tasks.onComplete(tasks.get(r.id));}catch{}});
   const server=createServer(async(req,res)=>{
     try{
@@ -209,8 +214,7 @@ export function createApp(env=process.env){
             if(current.validation.errors.length)fail('Resolve this question’s failed content checks.');
             if(!body.checkedEvidence)fail('Confirm this script was checked against its source evidence.');
             if(current.validation.warnings.length&&!body.checkedWarnings)fail('Acknowledge this question’s conditional-word and source flags.');
-            const savedAudit=job.questionAudits?.[index],audit=savedAudit?.draftHash===current.draftHash?savedAudit:null;
-            if(audit&&!audit.manual&&!audit.passed||!audit&&job.origin?.startsWith('OpenAI')&&!job.audit?.passed)fail('The source audit has unresolved issues. Request changes.');
+            try{assertSourceAudit(job,index);}catch{fail('The source audit has unresolved issues. Request changes.');}
           }
           if(body.decision==='skip'&&current.status!=='pending')fail('Only a pending question can be skipped.',409);
           if(body.decision==='restore'&&current.status!=='skipped')fail('Only a skipped question can be returned to review.',409);

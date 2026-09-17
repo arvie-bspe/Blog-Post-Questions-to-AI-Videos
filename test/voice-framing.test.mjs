@@ -19,7 +19,7 @@ import {VideoService} from '../src/video-service.mjs';
 import {scriptText} from '../src/video-domain.mjs';
 import {captionCase} from '../src/heygen-domain.mjs';
 const avatar=presenterPool.avatars.find(a=>a.gender==='male'),male=presenterPool.voices.find(v=>v.gender==='male'),female=presenterPool.voices.find(v=>v.gender==='female');
-const fixture=n=>JSON.parse(readFileSync(new URL('../fixtures/'+n+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 function parent(store,hash=rulesHash){const raw=fixture('paul'),doc=inspect(raw),row=parseMonthly(fixture('monthly')).find(r=>r.documentId===raw.documentId),client=parseClients(fixture('clients')).find(c=>c.key===row.clientKey);const p=store.create({identity:'voice-test',doc,row,client,rulesHash:hash,mode:'saved_snapshot'});p.plan=preparedExample(doc);p.origin='Manual fixture';store.save(p);return p;}
 test('catalog gender is required and legacy known IDs are resolved without guessing',()=>{
  assert.throws(()=>matchingPresenter(avatar,female),/GENDER_MISMATCH/);

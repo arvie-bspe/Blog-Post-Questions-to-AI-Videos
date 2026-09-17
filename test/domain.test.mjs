@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {inspect,paragraphsFromGoogle,parseMonthly,parseClients,selectClient,validatePlan,containsTerm,orderAllowed,cellText,identity} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {clientRules,globalContent,rulesHash,config} from '../src/rules.mjs';
-const read=name=>JSON.parse(readFileSync(new URL('../fixtures/'+name+'.json',import.meta.url)));
+import {fixture as read} from './fixture-data.mjs';
 const doc=inspect(read('paul')),client=parseClients(read('clients'))[0];
 const plan=()=>preparedExample(doc);
 test('Paul example uses 2 real body questions, exact quotes, and passes local checks',()=>{

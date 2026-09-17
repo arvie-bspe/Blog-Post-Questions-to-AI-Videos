@@ -14,7 +14,7 @@ export function manualRevision(job,body,actor){
   const next=structuredClone(job);
   next.history=[...(next.history||[]),...(job.plan?[{at:job.updated,plan:job.plan,reviews:job.reviews,origin:job.origin,validation:job.validation,audit:job.audit,revision:job.revision}]:[])];
   next.plan=structuredClone(plan);next.validation=validation;
-  next.origin='Manual revision with source evidence; no API generation';
+  next.origin='Manual revision with source evidence; no API generation';next.auditRequired=false;
   next.audit={passed:null,issues:['Manual draft revision. A script reviewer must review the revised wording against the cited article.']};
   next.status='content_review';next.error=null;next.scriptTargetSeconds=30;
   next.draftVersion=(job.draftVersion||1)+1;

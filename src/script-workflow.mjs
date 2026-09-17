@@ -30,7 +30,7 @@ export class ScriptWorkflow{
     const limit=Number(this.env.DAILY_ANALYSIS_LIMIT||10);if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid daily analysis limit.');this.store.consume(limit);
     const previousPlan=job.plan;
     if(job.plan)job.history=[...(job.history||[]),{at:job.updated,plan:job.plan,reviews:job.reviews,origin:job.origin,audit:job.audit,validation:job.validation,revision:job.revision}];
-    job.status='analyzing';job.reviews=[];job.plan=null;job.error=null;job.origin='OpenAI API draft with separate semantic review';job.revisionRequest={feedback,status:'working',at:new Date().toISOString()};this.store.save(job);this.active.add(id);
+    job.status='analyzing';job.reviews=[];job.plan=null;job.error=null;job.origin='OpenAI API draft with separate semantic review';job.auditRequired=true;job.revisionRequest={feedback,status:'working',at:new Date().toISOString()};this.store.save(job);this.active.add(id);
     this.analyzer(job.doc,job.client,{previousPlan,feedback}).then(result=>{Object.assign(job,result);job.status=result.validation.errors.length||!result.audit.passed?'needs_review':'content_review';job.revisionRequest.status='applied';this.store.save(job);this.store.record(id,'system','script_revision_finished');}).catch(e=>{job.status='failed';job.error=e.message;job.revisionRequest.status='failed';this.store.save(job);}).finally(()=>this.active.delete(id));return job;
   }
   async startDirect(id,feedback='',index){
@@ -60,7 +60,7 @@ export class ScriptWorkflow{
     feedback=[...new Set([...(job.reviews||[]).filter(r=>r.decision==='reject').map(r=>r.note),feedback].filter(Boolean))].join('\n\n');
     const previousPlan=job.plan?structuredClone(job.plan):null;
     if(job.plan)job.history=[...(job.history||[]),{at:job.updated,plan:job.plan,reviews:job.reviews,origin:job.origin,audit:job.audit,validation:job.validation,revision:job.revision}];
-    job.status='analyzing';job.reviews=[];job.questionReviews=[];job.plan=null;job.error=null;job.analysisAttempt=(job.analysisAttempt||0)+1;job.origin=provider==='codex_worker'?'Local Codex worker draft with source audit':'Claude API draft with source audit';job.revisionRequest={feedback,status:'working',provider,at:new Date().toISOString()};this.store.save(job);
+    job.status='analyzing';job.reviews=[];job.questionReviews=[];job.plan=null;job.error=null;job.analysisAttempt=(job.analysisAttempt||0)+1;job.origin=provider==='codex_worker'?'Local Codex worker draft with source audit':'Claude API draft with source audit';job.auditRequired=true;job.revisionRequest={feedback,status:'working',provider,at:new Date().toISOString()};this.store.save(job);
     const submitted=this.directResolver.submit(job,{previousPlan,feedback,maxVideos:job.maxVideos||2});
     if(submitted.task){job.analysisTaskId=submitted.task.id;this.store.save(job);}else this.finishDirectPromise(submitted.promise,{jobId:id});
     return job;
@@ -89,6 +89,20 @@ export class ScriptWorkflow{
     const validated=validateDirectResult(result,current);Object.assign(current,validated);current.status=validated.validation.errors.length||!validated.audit.passed?'needs_review':'content_review';current.revisionRequest={...(current.revisionRequest||{}),status:'applied'};current.analysisTaskId=null;current.error=null;this.store.save(current);this.store.record(jobId,'system','script_analysis_finished');return current;
   }
   failDirect(error,{jobId,index}){const job=this.store.get(jobId);if(!job)return;if(Number.isInteger(index)&&job.questionRequests?.[index]){job.questionRequests[index].status='failed';job.questionRequests[index].error=error.message;updateQuestionStatus(job);}else{job.status='failed';job.error=error.message;if(job.revisionRequest)job.revisionRequest.status='failed';}this.store.save(job);}
+  failTask(task){
+    if(task.type!=='ai_codex')return;
+    const context=task.payload?.context||{},job=this.store.get(context.jobId);if(!job)return;
+    const message=task.error||'The AI worker exhausted its retries.';
+    if(Number.isInteger(context.index)){
+      const request=job.questionRequests?.[context.index];
+      if(!request||request.taskId!==task.id||!['working','queued'].includes(request.status))return;
+      request.status='failed';request.error=message;updateQuestionStatus(job);
+    }else{
+      if(job.analysisTaskId!==task.id||!['analyzing','interrupted'].includes(job.status))return;
+      job.status='failed';job.error=message;if(job.revisionRequest)job.revisionRequest.status='failed';
+    }
+    this.store.save(job);this.store.record(job.id,'system','ai_worker_task_failed');
+  }
   async startQuestion(id,feedback,index){
     const job=this.store.get(id),state=questionState(job,index),key=id+':'+index;
     if(this.active.has(key))throw new Error('This question is already being revised.');

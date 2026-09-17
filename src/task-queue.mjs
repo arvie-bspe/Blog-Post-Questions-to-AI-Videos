@@ -7,8 +7,8 @@ const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status
 const publicTask=t=>{const {leaseToken,payload,...safe}=t;return {...safe,payload};};
 
 export class TaskQueue{
-  constructor({db,dataDir,env=process.env,onComplete=async()=>{}}){
-    Object.assign(this,{db,dataDir,env,onComplete});
+  constructor({db,dataDir,env=process.env,onComplete=async()=>{},onFailure=()=>{}}){
+    Object.assign(this,{db,dataDir,env,onComplete,onFailure});
     this.root=join(dataDir,'worker-tasks');mkdirSync(this.root,{recursive:true});
     db.exec(`CREATE TABLE IF NOT EXISTS worker_tasks(
       id TEXT PRIMARY KEY,type TEXT NOT NULL,subject TEXT NOT NULL,status TEXT NOT NULL,
@@ -39,6 +39,11 @@ export class TaskQueue{
     this.db.prepare("UPDATE worker_tasks SET status='failed',error=?,applied_at=?,available_at=NULL,updated=? WHERE subject=? AND status='queued' AND id<>?").run(message,at,at,subject,keepId);
     return this.list(subject);
   }
+  applyFailure(task){
+    if(!task||task.status!=='failed'||task.appliedAt)return task;
+    this.onFailure(task);this.markApplied(task.id);return this.get(task.id);
+  }
+  reconcileFailures(){for(const row of this.db.prepare("SELECT id FROM worker_tasks WHERE status='failed' AND applied_at IS NULL ORDER BY created").all())try{this.applyFailure(this.get(row.id));}catch{};}
   reclaimExpired(){const at=now();this.db.prepare("UPDATE worker_tasks SET status=CASE WHEN attempts>=max_attempts THEN 'failed' ELSE 'queued' END,error=CASE WHEN attempts>=max_attempts THEN 'Worker lease expired too many times.' ELSE error END,available_at=CASE WHEN attempts>=max_attempts THEN NULL ELSE ? END,lease_token=NULL,lease_owner=NULL,lease_until=NULL,updated=? WHERE status='working' AND lease_until<?").run(at,at,at);}
   enqueue({type,subject,payload,priority=50,idempotencyKey,maxAttempts=3}){
     if(!/^[a-z][a-z0-9_]{2,40}$/.test(type)||typeof subject!=='string'||!subject)fail('Invalid worker task.');
@@ -49,7 +54,7 @@ export class TaskQueue{
   claim({workerId,types,leaseSeconds=90}){
     if(typeof workerId!=='string'||!/^[-\w.]{3,80}$/.test(workerId))fail('Invalid worker ID.');
     const allowed=[...new Set((types||[]).filter(x=>/^[a-z][a-z0-9_]{2,40}$/.test(x)))];if(!allowed.length)fail('Worker must declare task types.');
-    leaseSeconds=Math.max(30,Math.min(300,Number(leaseSeconds)||90));this.touch(workerId,allowed);this.reclaimExpired();
+    leaseSeconds=Math.max(30,Math.min(300,Number(leaseSeconds)||90));this.touch(workerId,allowed);this.reclaimExpired();this.reconcileFailures();
     this.db.exec('BEGIN IMMEDIATE');try{
       const marks=allowed.map(()=>'?').join(','),r=this.db.prepare(`SELECT * FROM worker_tasks WHERE status='queued' AND attempts<max_attempts AND (available_at IS NULL OR available_at<=?) AND type IN (${marks}) ORDER BY priority ASC,created ASC LIMIT 1`).get(now(),...allowed);
       if(!r){this.db.exec('COMMIT');return null;}
@@ -60,8 +65,8 @@ export class TaskQueue{
   }
   leased(id,token){const task=this.get(id);if(!task)fail('Worker task not found.',404);if(task.status!=='working'||task.leaseToken!==token||Date.parse(task.leaseUntil)<=Date.now())fail('Worker task lease is no longer current.',409);return task;}
   heartbeat(id,token,seconds=90){const task=this.leased(id,token),until=new Date(Date.now()+Math.max(30,Math.min(300,Number(seconds)||90))*1000).toISOString();this.touch(task.leaseOwner,[task.type]);this.db.prepare('UPDATE worker_tasks SET lease_until=?,updated=? WHERE id=?').run(until,now(),id);return {...publicTask(this.get(id)),leaseUntil:until};}
-  async complete(id,token,result){const leased=this.leased(id,token);this.touch(leased.leaseOwner,[leased.type]);const at=now();this.db.prepare("UPDATE worker_tasks SET status='completed',result=?,error=NULL,available_at=NULL,lease_token=NULL,lease_owner=NULL,lease_until=NULL,updated=? WHERE id=?").run(JSON.stringify(result),at,id);const task=this.get(id);try{await this.onComplete(task);}catch(error){this.db.prepare("UPDATE worker_tasks SET status='failed',error=?,updated=? WHERE id=?").run(String(error.message||error).slice(0,4000),now(),id);throw error;}return publicTask(this.get(id));}
-  fail(id,token,message,retryable=true){const task=this.leased(id,token),willRetry=retryable&&task.attempts<task.max_attempts,status=willRetry?'queued':'failed',available=willRetry?new Date(Date.now()+Math.min(60,5*2**Math.max(0,task.attempts-1))*1000).toISOString():null;this.touch(task.leaseOwner,[task.type]);this.db.prepare('UPDATE worker_tasks SET status=?,error=?,available_at=?,lease_token=NULL,lease_owner=NULL,lease_until=NULL,updated=? WHERE id=?').run(status,String(message||'Worker task failed.').slice(0,4000),available,now(),id);return publicTask(this.get(id));}
+  async complete(id,token,result){const leased=this.leased(id,token);this.touch(leased.leaseOwner,[leased.type]);const at=now();this.db.prepare("UPDATE worker_tasks SET status='completed',result=?,error=NULL,available_at=NULL,lease_token=NULL,lease_owner=NULL,lease_until=NULL,updated=? WHERE id=?").run(JSON.stringify(result),at,id);const task=this.get(id);try{await this.onComplete(task);}catch(error){this.db.prepare("UPDATE worker_tasks SET status='failed',error=?,updated=? WHERE id=?").run(String(error.message||error).slice(0,4000),now(),id);this.applyFailure(this.get(id));throw error;}return publicTask(this.get(id));}
+  fail(id,token,message,retryable=true){const task=this.leased(id,token),willRetry=retryable&&task.attempts<task.max_attempts,status=willRetry?'queued':'failed',available=willRetry?new Date(Date.now()+Math.min(60,5*2**Math.max(0,task.attempts-1))*1000).toISOString():null;this.touch(task.leaseOwner,[task.type]);this.db.prepare('UPDATE worker_tasks SET status=?,error=?,available_at=?,lease_token=NULL,lease_owner=NULL,lease_until=NULL,updated=? WHERE id=?').run(status,String(message||'Worker task failed.').slice(0,4000),available,now(),id);if(!willRetry)this.applyFailure(this.get(id));return publicTask(this.get(id));}
   markApplied(id){this.db.prepare('UPDATE worker_tasks SET applied_at=?,updated=? WHERE id=? AND applied_at IS NULL').run(now(),now(),id);}
   artifactDir(id){const task=this.get(id);if(!task)fail('Worker task not found.',404);const dir=join(this.root,id);mkdirSync(dir,{recursive:true});return dir;}
   artifactPath(id,name){if(!['voice.wav','presenter.mp4','alignment.json'].includes(name))fail('Unsupported worker artifact.');return join(this.artifactDir(id),name);}

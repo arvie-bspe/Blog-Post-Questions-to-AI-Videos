@@ -40,16 +40,37 @@ export function prepareWorkerVideo(job,index,provider='local_worker'){
 export const prepareLocal=(job,index)=>prepareWorkerVideo(job,index,'local_worker');
 
 export async function queueWorkerVideo(service,parent,index,actor,provider=videoProvider(service.env)){
-  const data=prepareWorkerVideo(parent,index,provider),existing=service.db.prepare('SELECT payload FROM videos WHERE identity=?').get(data.identity);if(existing)return JSON.parse(existing.payload);
-  data.createdBy=actor;service.save(data);await service.ensureLogo(data);return enqueueWorkerRecord(service,data,parent,actor);
+  const data=prepareWorkerVideo(parent,index,provider),existing=service.db.prepare('SELECT payload FROM videos WHERE identity=?').get(data.identity);
+  if(existing){
+    const saved=JSON.parse(existing.payload);
+    if(!saved.workerTaskId&&['prepared','needs_attention','failed'].includes(saved.status))return finishWorkerSetup(service,saved,parent,actor);
+    if(saved.status==='failed'&&saved.workerTaskId&&service.tasks.get(saved.workerTaskId)?.status==='failed')return retryWorkerVideo(service,saved.id,actor);
+    return saved;
+  }
+  data.createdBy=actor;service.save(data);return finishWorkerSetup(service,data,parent,actor);
 }
 export const queueLocalVideo=(service,parent,index,actor)=>queueWorkerVideo(service,parent,index,actor,'local_worker');
+
+async function finishWorkerSetup(service,data,parent,actor){
+  try{data.status='prepared';data.stage='logo_setup';data.error=null;service.save(data);await service.ensureLogo(data);return enqueueWorkerRecord(service,data,parent,actor);}
+  catch(error){data.status='needs_attention';data.stage='logo_setup';data.error=String(error.message||error).slice(0,4000);service.save(data);throw error;}
+}
 
 async function enqueueWorkerRecord(service,data,parent,actor){
   const selected=mode(data.provider),payload={context:{videoId:data.id,parentId:parent.id,index:data.index,sourceHash:parent.doc.sourceHash,approvalHash:data.approvalHash},script:data.script,question:data.question,voice:data.voice,target:{seconds:30,aspectRatio:'9:16'},engines:selected.engines};
   if(data.provider==='local_worker')payload.presenterAsset=data.avatar.asset;else payload.profileKey=data.avatar.profileKey;
-  const task=service.tasks.enqueue({type:selected.taskType,subject:data.id,payload,priority:20,idempotencyKey:hash([selected.taskType,data.id,data.approvalHash])});
+  const task=service.tasks.enqueue({type:selected.taskType,subject:data.id,payload,priority:20,idempotencyKey:hash([selected.taskType,data.id,data.approvalHash,data.renderAttempt||1])});
   data.workerTaskId=task.id;data.status='working';data.stage=selected.stage;data.requests[selected.requestKey]={id:task.id,state:'queued'};service.save(data);service.store.record(parent.id,actor,data.provider==='liteavatar_worker'?'queue_liteavatar_cpu_video':'queue_local_talking_video');return data;
+}
+export async function retryWorkerVideo(service,id,actor){
+  const data=service.get(id);if(!isWorkerVideoProvider(data.provider))throw new Error('Only a self-hosted worker video can use this retry.');
+  if(!['failed','needs_attention'].includes(data.status))throw new Error('Only a failed worker video can be retried.');
+  const parent=service.store.get(data.parentId);await service.validate(data);
+  if(data.stage==='logo_setup'||!data.workerTaskId)return finishWorkerSetup(service,data,parent,actor);
+  if(data.files?.original&&data.files?.voice){data.status='compositing';data.stage='compositing';data.error=null;service.save(data);service.resumeWorkerComposition(data);return data;}
+  const task=service.tasks.get(data.workerTaskId);if(task&&!['failed'].includes(task.status))throw new Error('The existing render task is still active.');
+  data.renderAttempt=(data.renderAttempt||1)+1;data.workerTaskId=null;data.status='prepared';data.stage=null;data.error=null;service.save(data);
+  return enqueueWorkerRecord(service,data,parent,actor);
 }
 
 export async function queueLocalReplacement(service,old,actor){

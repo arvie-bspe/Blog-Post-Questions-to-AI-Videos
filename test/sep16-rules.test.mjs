@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {inspect,withClientSelection,validatePlan} from '../src/domain.mjs';
@@ -10,7 +10,8 @@ import {choosePresenter,presenterPool} from '../src/presenter-selection.mjs';
 import {Store} from '../src/store.mjs';
 import {ScriptWorkflow} from '../src/script-workflow.mjs';
 import {adoptSourceIdentity} from '../src/source-records.mjs';
-const raw=JSON.parse(readFileSync(new URL('../fixtures/paul.json',import.meta.url))),doc=inspect(raw),plan=preparedExample(doc);
+import {fixture} from './fixture-data.mjs';
+const raw=fixture('paul'),doc=inspect(raw),plan=preparedExample(doc);
 test('refresh links empty duplicate inspections while preserving every record and any existing draft',()=>{
  const dir=mkdtempSync(join(tmpdir(),'source-link-')),store=new Store(join(dir,'db'));
  try{const old=store.create({identity:'snapshot',plan}),empty=store.create({identity:'live'});

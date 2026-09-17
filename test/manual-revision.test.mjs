@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {once} from 'node:events';
@@ -10,7 +10,7 @@ import {preparedExample} from '../src/sample.mjs';
 import {manualRevision} from '../src/manual-revision.mjs';
 import {createApp} from '../src/server.mjs';
 import {rulesHash} from '../src/rules.mjs';
-const fixture=name=>JSON.parse(readFileSync(new URL('../fixtures/'+name+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 const doc=inspect(fixture('paul')),client=parseClients(fixture('clients'))[0];
 const original=()=>({id:'00000000-0000-0000-0000-000000000001',identity:'manual-test',doc,client,plan:preparedExample(doc),revision:5,status:'changes_requested',rulesHash,mode:'saved_snapshot',reviews:[{actor:'Keziah',decision:'reject',note:'Shorten both scripts to 30 seconds.'}],origin:'Prepared in Codex',updated:'2026-09-15T00:00:00Z'});
 const edit=j=>{const plan=structuredClone(j.plan);for(const v of plan.videos)v.sentences=v.sentences.slice(0,1);return {expectedRevision:j.revision,note:'Manual shortening test only; the team must review the resulting text.',plan};};

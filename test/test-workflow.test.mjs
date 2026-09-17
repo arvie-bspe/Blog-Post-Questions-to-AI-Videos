@@ -13,14 +13,14 @@ import {liveSource} from '../src/integrations.mjs';
 import {inspect,parseClients,validatePlan} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {rulesHash} from '../src/rules.mjs';
-const fixture=n=>JSON.parse(readFileSync(new URL('../fixtures/'+n+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 const wait=async()=>new Promise(r=>setTimeout(r,20));
 test('live inspection reads the selected row in J/L, discovers visible tabs, and refuses ineligible orders',async()=>{
   const monthly=fixture('monthly'),source=fixture('paul'),header=monthly.data[0].rowData[0],target=monthly.data[0].rowData[1],calls=[];
   const sheet={sheetId:123,title:'October 2026',gridProperties:{rowCount:200}};
   let bad=false;
   const read=async url=>{calls.push(url);if(url.includes('fields=sheets.properties'))return {sheets:[{properties:sheet}]};if(url.includes('includeGridData')){const row=structuredClone(target);if(bad)row.values[1]={formattedValue:'Social Post'};return {sheets:[{properties:sheet,data:[{startRow:0,rowData:[header]},{startRow:99,rowData:[row]}]}]};}if(url.includes('/values/'))return {values:fixture('clients')};return source;};
-  const result=await liveSource(sheet.title,100,{read});assert.equal(result.row.rowNumber,100);assert.equal(result.row.documentId,source.documentId);assert.match(result.client.homepage,/michigandefenselaw/);assert.ok(calls.some(u=>decodeURIComponent(u).includes('A100:L100')));
+  const result=await liveSource(sheet.title,100,{read});assert.equal(result.row.rowNumber,100);assert.equal(result.row.documentId,source.documentId);assert.match(result.client.homepage,/example\.test/);assert.ok(calls.some(u=>decodeURIComponent(u).includes('A100:L100')));
   bad=true;await assert.rejects(liveSource(sheet.title,100,{read}),/not eligible/);await assert.rejects(liveSource('Hidden tab',100,{read}),/visible worksheet/);
 });
 test('without OpenAI, feedback creates a visible revision request and keeps original script and review',async()=>{
@@ -71,7 +71,7 @@ test('SVG homepage logo is rasterised with Chromium and cached by domain',async 
   if(!process.env.LOGO_CHROMIUM_PATH)return t.skip('Set LOGO_CHROMIUM_PATH for the local Chromium integration check.');
   const dir=mkdtempSync(join(tmpdir(),'logo-svg-')),calls=[];
   try{
-    const logo=new LogoService(dir,{fetcher:async url=>{calls.push(url);return url.endsWith('/brand.svg')?{url,headers:{'content-type':'image/svg+xml'},body:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="100"><rect width="400" height="100" fill="#253963"/><text x="20" y="65" font-size="40" fill="white">TEST FIRM</text></svg>')}:{url,headers:{'content-type':'text/html'},body:Buffer.from('<img alt="Firm logo" src="/brand.svg">')};}});
+    const logo=new LogoService(dir,{analyzer:async()=>({faces:[],texts:[]}),fetcher:async url=>{calls.push(url);return url.endsWith('/brand.svg')?{url,headers:{'content-type':'image/svg+xml'},body:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="100"><rect width="400" height="100" fill="#253963"/><text x="20" y="65" font-size="40" fill="white">TEST FIRM</text></svg>')}:{url,headers:{'content-type':'text/html'},body:Buffer.from('<img alt="Firm logo" src="/brand.svg">')};}});
     const parent={client:{name:'Test Firm',homepage:'https://firm.example/'},row:{}};const first=await logo.acquire(parent),second=await logo.acquire(parent);assert.equal(first.domain,'firm.example');assert.equal(first.hash,second.hash);assert.equal(calls.length,2);assert.equal(readFileSync(first.path).subarray(1,4).toString(),'PNG');assert.equal(first.sourceContentType,'image/svg+xml');
   }finally{rmSync(dir,{recursive:true,force:true});}
 });

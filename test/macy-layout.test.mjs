@@ -15,7 +15,7 @@ import {VideoService} from '../src/video-service.mjs';
 import {inspect,parseClients,parseMonthly} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {scriptText} from '../src/video-domain.mjs';
-const fixture=n=>JSON.parse(readFileSync(new URL('../fixtures/'+n+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 function parent(store,old=false){const raw=fixture('paul'),row=parseMonthly(fixture('monthly')).find(r=>r.documentId===raw.documentId),doc=inspect(raw),client=parseClients(fixture('clients')).find(c=>c.key===row.clientKey),j=store.create({identity:'source',row,doc,client,mode:'saved_snapshot',rulesHash:old?'previous-1.3-rules':rulesHash,rulesVersion:old?'1.2.0':config.version});j.plan=preparedExample(doc);j.origin='Prepared in Codex';j.status='pilot_reviewed';j.reviews=[{actor:'Keziah',decision:'approve',note:'Automated fixture only'}];approveFixture(j);store.save(j);return j;}
 
 test('the two updated sources replace the standalone layout specification',()=>{

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {once} from 'node:events';
@@ -15,7 +15,7 @@ import {questionHash,questionState,recordQuestionReview,approvedQuestion} from '
 import {reconcileRules} from '../src/rules-migration.mjs';
 import {createApp} from '../src/server.mjs';
 import {approveFixture} from './question-fixture.mjs';
-const fixture=n=>JSON.parse(readFileSync(new URL('../fixtures/'+n+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 const source=()=>{const doc=inspect(fixture('paul'));return {identity:'question-test',doc,plan:preparedExample(doc),client:parseClients(fixture('clients'))[0],mode:'saved_snapshot',rulesHash,origin:'Manual draft',status:'content_review',reviews:[],revision:1};};
 test('only a changed question loses approval, and source identity changes invalidate all affected approvals',()=>{
  const j=source();approveFixture(j);const sibling=approvedQuestion(j,1),plan=structuredClone(j.plan);plan.videos[0].sentences[0].text='Support letters provide independent evidence of sobriety.';
@@ -42,10 +42,9 @@ test('one approved question and one skipped question complete selection without 
  assert.equal(j.status,'pilot_reviewed');assert.equal(questionState(j,0).status,'approved');assert.equal(questionState(j,1).status,'skipped');assert.doesNotThrow(()=>approvedQuestion(j,0));assert.throws(()=>approvedQuestion(j,1),/review/);
 });
 test('HTTP approval requires one index, scopes generation, and lets one rejected script coexist with an approved sibling',async()=>{
- const dir=mkdtempSync(join(tmpdir(),'one-approval-http-')),app=createApp({HOST:'127.0.0.1',PORT:'4180',APP_ORIGIN:'http://127.0.0.1:4180',DATA_DIR:dir});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
- const j=app.store.create(source()),calls=[];app.video.automation.enqueue=(id,actor,index)=>{calls.push(index);};
+ const dir=mkdtempSync(join(tmpdir(),'one-approval-http-')),app=createApp({HOST:'127.0.0.1',PORT:'4180',APP_ORIGIN:'http://127.0.0.1:4180',DATA_DIR:dir});
  const request=body=>new Promise((resolve,reject)=>{const req=httpRequest(`http://127.0.0.1:${app.server.address().port}/api/jobs/${j.id}/review`,{method:'POST',headers:{Host:'127.0.0.1:4180',Origin:'http://127.0.0.1:4180','Content-Type':'application/json','X-Reviewer':'Keziah'}},res=>{let data='';res.on('data',c=>data+=c);res.on('end',()=>resolve({status:res.statusCode,body:JSON.parse(data)}));});req.on('error',reject);req.end(JSON.stringify(body));});
- try{const data={decision:'approve',note:'Automated fixture only; evidence checked.',checkedEvidence:true,checkedWarnings:true};
+ let j,calls=[];try{app.server.listen(0,'127.0.0.1');await once(app.server,'listening');j=app.store.create(source());app.video.automation.enqueue=(id,actor,index)=>{calls.push(index);};const data={decision:'approve',note:'Automated fixture only; evidence checked.',checkedEvidence:true,checkedWarnings:true};
   assert.equal((await request(data)).status,400);assert.equal((await request({...data,index:99})).status,400);assert.deepEqual(calls,[]);
   const a=await request({...data,index:0,expectedQuestionHash:questionHash(j,0)});assert.equal(a.status,200,a.body.error);assert.equal(a.body.questionStates[0].status,'approved');assert.equal(a.body.questionStates[1].status,'pending');assert.deepEqual(calls,[0]);const approved=approvedQuestion(app.store.get(j.id),0);
   assert.equal((await request({...data,index:0})).status,409);const b=await request({...data,index:1,decision:'reject',note:'Please revise only this second question.'});assert.equal(b.status,200);assert.equal(b.body.questionStates[1].status,'revision_pending');assert.equal(b.body.questionStates[1].request.status,'awaiting_manual_update');assert.equal(approvedQuestion(app.store.get(j.id),0),approved);assert.deepEqual(calls,[0]);

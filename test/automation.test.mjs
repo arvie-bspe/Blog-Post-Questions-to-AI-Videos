@@ -3,7 +3,7 @@ import {questionState,approvedQuestion,recordQuestionReview} from '../src/questi
 import {config} from '../src/rules.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {inspect,parseClients,parseMonthly} from '../src/domain.mjs';
@@ -13,7 +13,7 @@ import {Store} from '../src/store.mjs';
 import {presenterPath} from '../src/media.mjs';
 import {VideoService} from '../src/video-service.mjs';
 import {presenterPool} from '../src/presenter-selection.mjs';
-const fixture=n=>JSON.parse(readFileSync(new URL('../fixtures/'+n+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 const avatar={id:'mock_studio',name:'Mock speaking presenter',type:'studio_avatar',gender:'male',supported_api_engines:['avatar_iv'],status:'completed'};
 const voice={id:'mock_voice',name:'Mock English voice',language:'English',gender:'male'};
 const settings={enabled:true,avatarId:avatar.id,voiceId:voice.id,maxEstimatedCost:2,acceptCost:true};

@@ -16,7 +16,7 @@ import {config,rulesHash} from '../src/rules.mjs';
 import {parseClients,parseMonthly,selectClient,inspect} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {finishWorkerVideo} from '../src/local-video.mjs';
-const fixture=name=>JSON.parse(readFileSync(new URL('../fixtures/'+name+'.json',import.meta.url)));
+import {fixture} from './fixture-data.mjs';
 function parent(store){
   const source=fixture('paul'),row=parseMonthly(fixture('monthly')).find(r=>r.documentId===source.documentId),client=selectClient(parseClients(fixture('clients')),row.clientKey),doc=inspect(source,row.titleHint);
   const j=store.create({identity:'test',doc,row,client,rulesHash,rulesVersion:config.version,mode:'saved_snapshot'});
@@ -197,6 +197,7 @@ test('missing HeyGen key never falls back to an existing fal key',async()=>{
 
 
 test('one mocked HeyGen generation automatically assembles real media then waits for Macy review',async t=>{
+  if(!process.env.LOGO_CHROMIUM_PATH)return t.skip('Set LOGO_CHROMIUM_PATH for the local Chromium composition check.');
   const media=mediaTools();try{await media.check();}catch{return t.skip('FFmpeg required.');}
   // This test isolates composition/review with a gray synthetic clip. Real face tracking is checked separately.
   media.analyzeVisual=async()=>({crop:{x:0,y:0,width:1080,height:1920},faceProtected:{left:.3,top:.12,right:.6,bottom:.4},texts:[],fixture:true});

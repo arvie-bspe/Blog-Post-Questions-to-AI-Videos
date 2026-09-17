@@ -11,8 +11,9 @@ import {HeyGen,providerId} from './heygen.mjs';
 import {mediaTools,durationOf,compose} from './media.mjs';
 import {layoutVersion,detectorVersion} from './visual-checks.mjs';
 import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
-import {applyLocalVideoTask,finishWorkerVideo} from './local-video.mjs';
+import {applyLocalVideoTask,finishWorkerVideo,retryWorkerVideo} from './local-video.mjs';
 import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
+import {rulesHash,appearanceRulesHash} from './rules.mjs';
 const error=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 export const publicJob=j=>{if(!j)return j;const {requests,identity,...rest}=j,known=j.provider==='heygen'||isWorkerVideoProvider(j.provider);return {...rest,presenterIssue:known?presenterIssue(j.avatar,j.voice):null,provider:j.provider||'fal.ai',legacy:!known,requests:Object.fromEntries(Object.entries(requests||{}).map(([stage,r])=>[stage,{id:r.id||null,state:r.state,submittedAt:r.submittedAt||null}]))};};
@@ -38,7 +39,7 @@ export class VideoService {
   save(j){j.updated=now();this.db.prepare('INSERT INTO videos VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated,payload=excluded.payload').run(j.id,j.identity,j.parentId,j.updated,JSON.stringify(j));return j;}
   directory(j){const dir=join(this.dataDir,'videos',j.id);mkdirSync(dir,{recursive:true});return dir;}
   assertHeyGenEnabled(){if(videoProvider(this.env)!=='heygen')error('HeyGen API generation is disabled while the Railway LiteAvatar CPU provider is active.',409);}
-  async catalog(){await this.ready;const provider=videoProvider(this.env),worker=isWorkerVideoProvider(provider),lite=provider==='liteavatar_worker';return {backend:lite?'Railway CPU · Kokoro + LiteAvatar':worker?'Private worker · Kokoro + SadTalker':'HeyGen',provider,configured:worker?Boolean(this.env.STUDIO_WORKER_TOKEN):Boolean(this.env.HEYGEN_API_KEY),ffmpeg:this.mediaReady,prices:worker?{currency:'USD',providerCharge:0,hosting:'Railway usage'}:prices,targetSeconds:30,nativeResolution:worker?'Worker generated':'1080p',outputResolution:'1080 × 1920',aspectRatio:'9:16',layoutVersion,detectorVersion,endCardSeconds:3,logoRequired:true,presenterMode:lite?'Approved LiteAvatar trial profile':worker?'Approved local presenter image':'HeyGen Studio Avatar',dailyLimit:worker?null:Number(this.env.DAILY_VIDEO_LIMIT||2)};}
+  async catalog(){await this.ready;const provider=videoProvider(this.env),worker=isWorkerVideoProvider(provider),lite=provider==='liteavatar_worker';return {backend:lite?'Railway CPU · Kokoro + LiteAvatar':worker?'Private worker · Kokoro + SadTalker':'HeyGen',provider,configured:worker?Boolean(this.env.STUDIO_WORKER_TOKEN):Boolean(this.env.HEYGEN_API_KEY),ffmpeg:this.mediaReady,prices:worker?{currency:'USD',providerCharge:0,hosting:'Railway usage'}:prices,targetSeconds:30,nativeResolution:worker?'Worker generated':'1080p',outputResolution:'1080 × 1920',aspectRatio:'9:16',layoutVersion,detectorVersion,rulesHash,appearanceRulesHash,endCardSeconds:3,logoRequired:true,presenterMode:lite?'Approved LiteAvatar trial profile':worker?'Approved local presenter image':'HeyGen Studio Avatar',dailyLimit:worker?null:Number(this.env.DAILY_VIDEO_LIMIT||2)};}
   async library(kind,type='studio_avatar',token=''){
     this.assertHeyGenEnabled();
     if(!['avatars','voices'].includes(kind)||type!=='studio_avatar'||typeof token!=='string'||token.length>2048)error('Use the Studio Avatar library; Photo Avatars are disabled.');
@@ -74,6 +75,11 @@ export class VideoService {
     await this.checkFresh(parent,j.index);if(approved(this.store.get(j.parentId),j.index)!==j.approvalHash)error('The content review changed during this request.',409);
   }
   async applyWorkerTask(task){return applyLocalVideoTask(this,task);}
+  failWorkerTask(task){
+    const id=task.payload?.context?.videoId,j=id&&this.db.prepare('SELECT payload FROM videos WHERE id=?').get(id);if(!j)return;
+    const video=JSON.parse(j.payload);if(video.workerTaskId!==task.id||!['working','prepared','compositing','needs_attention'].includes(video.status))return;
+    video.status='failed';if(!video.files?.original||!video.files?.voice)video.stage='render_failed';video.error=task.error||'The video worker exhausted its retries.';this.save(video);this.automation.failVideo(video,video.error);this.store.record(video.parentId,'system','video_worker_task_failed');
+  }
   resumeWorkerComposition(j){
     if(this.closed||this.active.has(j.id))return;this.active.add(j.id);j.error=null;this.save(j);
     finishWorkerVideo(this,j).catch(()=>{}).finally(()=>this.active.delete(j.id));
@@ -206,7 +212,7 @@ export class VideoService {
     }
     const create=path.match(/^\/api\/jobs\/([a-f0-9-]+)\/videos$/);
     if(create){if(req.method==='GET')send(res,200,this.list(create[1]).map(j=>{let currentApproval=false;try{currentApproval=j.approvalHash===approved(this.store.get(j.parentId),j.index);}catch{}return {...publicJob(j),currentApproval};}));else if(req.method==='POST')send(res,200,await this.create(create[1],await json(req),actor));else error('Unsupported request.',405);return true;}
-    const route=path.match(/^\/api\/videos\/([a-f0-9-]+)(?:\/(speech|render|resume|review|revise|deliver|file|layout-upgrade|framing-replacement))?$/);if(!route)return false;
+    const route=path.match(/^\/api\/videos\/([a-f0-9-]+)(?:\/(speech|render|resume|retry-worker|review|revise|deliver|file|layout-upgrade|framing-replacement))?$/);if(!route)return false;
     const [,,action]=route,id=route[1];
     if(req.method==='GET'&&!action){send(res,200,publicJob(this.get(id)));return true;}
     if(['GET','HEAD'].includes(req.method)&&action==='file'){
@@ -219,6 +225,7 @@ export class VideoService {
     const body=await json(req);
     if(action==='layout-upgrade'){send(res,202,publicJob(await this.revisions.upgrade(id,actor)));return true;}
     if(action==='framing-replacement'){send(res,200,publicJob(await this.revisions.replaceFraming(id,actor)));return true;}
+    if(action==='retry-worker'){send(res,202,publicJob(await retryWorkerVideo(this,id,actor)));return true;}
     if(action==='revise'){send(res,200,publicJob(await this.revisions.apply(id,body,actor)));return true;}
     if(action==='deliver'){await this.validate(this.get(id));this.deliver(id);send(res,202,publicJob(this.get(id)));return true;}
     send(res,action==='review'?200:202,action==='review'?await this.review(id,body,actor):await this.start(id,action,body,actor));return true;

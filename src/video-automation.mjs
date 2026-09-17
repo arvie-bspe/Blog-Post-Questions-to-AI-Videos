@@ -19,7 +19,7 @@ export class ApprovalVideoAutomation {
     this.service=service;this.db=service.db;this.active=new Set();
     this.db.exec('CREATE TABLE IF NOT EXISTS video_automation_profiles(parent TEXT PRIMARY KEY,payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS video_approval_queue(id TEXT PRIMARY KEY,parent TEXT NOT NULL,updated TEXT NOT NULL,payload TEXT NOT NULL);');
     queueMicrotask(()=>{if(service.closed)return;for(const row of this.db.prepare('SELECT payload FROM video_approval_queue').all()){
-      const entry=JSON.parse(row.payload);if(['queued','working','blocked'].includes(entry.status))this.run(entry);
+      const entry=JSON.parse(row.payload);if(['queued','working'].includes(entry.status))this.run(entry);
     }});
   }
   profile(parent){
@@ -53,6 +53,12 @@ export class ApprovalVideoAutomation {
     queueMicrotask(()=>this.run(entry));return entry;
   }
   save(entry){this.db.prepare('INSERT INTO video_approval_queue VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated,payload=excluded.payload').run(entry.id,entry.parent,now(),JSON.stringify(entry));}
+  failVideo(video,message){
+    for(const row of this.db.prepare('SELECT payload FROM video_approval_queue WHERE parent=?').all(video.parentId)){
+      const entry=JSON.parse(row.payload);if(!entry.videos?.includes(video.id)||!['queued','working','submitted'].includes(entry.status))continue;
+      entry.status='blocked';entry.error=message;this.save(entry);
+    }
+  }
   assertProfile(parent,id){const current=this.profile(parent);if(!current?.enabled||current.id!==id)throw new Error('Automatic video settings changed or were disabled. Review this saved question approval before submission.');}
   async reuse(parent,index,approvalHash){
     const s=this.service,script=scriptText(parent.plan.videos[index]);

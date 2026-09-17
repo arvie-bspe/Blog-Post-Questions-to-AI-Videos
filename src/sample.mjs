@@ -18,6 +18,6 @@ export function preparedExample(doc){
       sentence('Submit a 12-panel urinalysis drug screen with a lab report measuring at least two integrity variables.','t.0:4302')
     ],cta:'',disclaimer:'',reviewFlags:[]
   }];
-  const articleIdentity={name:'Paul J. Tafelski, Michigan Defense Law',address:'2525 S Telegraph Rd, Suite 100 in Bloomfield Hills',phone:'(248) 451-2200',evidence:[{field:'name',...quote('t.0:719')},{field:'address',...quote('t.0:13083')},{field:'phone',...quote('t.0:13083')}]};
+  const articleIdentity={name:'Example Defense Law',address:'123 Main Street, Suite 100 in Example City',phone:'(555) 010-2200',evidence:[{field:'name',...quote('t.0:719')},{field:'address',...quote('t.0:13083')},{field:'phone',...quote('t.0:13083')}]};
   return {articleIdentity,presenterContext:{gender:'male',lawyerBlurbParagraphIds:['t.0:6880']},videos,skipped:doc.candidates.filter(c=>!videos.some(v=>v.candidateId===c.id)).map(c=>({candidateId:c.id,reason:'Deferred from this two-script prepared example. Still eligible for later selection.'}))};
 }
