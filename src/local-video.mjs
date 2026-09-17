@@ -65,5 +65,13 @@ export async function applyLocalVideoTask(service,task){
   const voiceProbe=await service.media.probe(join(dir,'voice.wav')),videoProbe=await service.media.probe(join(dir,'presenter.mp4')),duration=durationOf(voiceProbe);
   if(!videoProbe.streams.some(s=>s.codec_type==='video')||durationOf(videoProbe)<duration-.25||duration>180)throw new Error('Self-hosted talking-video output has invalid media or duration.');
   const alignment=JSON.parse(readFileSync(join(dir,'alignment.json'),'utf8'));j.duration=duration;j.cues=captions(alignment,j.script,j.question,duration);j.files={...j.files,voice:true,original:true};j.requests[selected.requestKey].state='completed';j.stage='compositing';j.status='compositing';service.save(j);
-  j.technicalQA=await service.compose(service.media,dir,j);j.detectorVersion=detectorVersion;await service.validate(j);j.status='visual_review';j.stage='visual_review';j.files={...j.files,video:true,thumbnail:true,captions:true,manifest:true};service.save(j);service.manifest(j);service.tasks.markApplied(task.id);return j;
+  return finishWorkerVideo(service,j,task.id);
+}
+
+export async function finishWorkerVideo(service,j,taskId=null){
+  try{
+    j.technicalQA=await service.compose(service.media,service.directory(j),j);j.detectorVersion=detectorVersion;await service.validate(j);j.status='visual_review';j.stage='visual_review';j.error=null;j.files={...j.files,video:true,thumbnail:true,captions:true,manifest:true};service.save(j);service.manifest(j);if(taskId)service.tasks.markApplied(taskId);return j;
+  }catch(e){
+    j.status='needs_attention';j.stage='compositing';j.error=String(e.message||e).slice(0,4000);service.save(j);throw e;
+  }
 }

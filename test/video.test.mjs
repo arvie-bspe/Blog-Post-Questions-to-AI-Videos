@@ -15,6 +15,7 @@ import {mediaTools,presenterPath,compose} from '../src/media.mjs';
 import {config,rulesHash} from '../src/rules.mjs';
 import {parseClients,parseMonthly,selectClient,inspect} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
+import {finishWorkerVideo} from '../src/local-video.mjs';
 const fixture=name=>JSON.parse(readFileSync(new URL('../fixtures/'+name+'.json',import.meta.url)));
 function parent(store){
   const source=fixture('paul'),row=parseMonthly(fixture('monthly')).find(r=>r.documentId===source.documentId),client=selectClient(parseClients(fixture('clients')),row.clientKey),doc=inspect(source,row.titleHint);
@@ -85,6 +86,16 @@ test('LiteAvatar selection blocks every HeyGen spend path and routes historical 
     let run;for(let i=0;i<100;i++){run=h.service.automation.view(h.parent.id).lastRun;if(run?.status==='submitted')break;await new Promise(r=>setTimeout(r,10));}
     assert.equal(run?.status,'submitted',run?.error);assert.equal(queued.length,1);assert.equal(queued[0].type,'media_liteavatar');
     const generated=h.service.get(run.videos[0]);assert.equal(generated.provider,'liteavatar_worker');assert.equal(generated.renderEstimate,0);assert.equal(providerCalls,0);
+  }finally{h.close();}
+});
+
+test('self-hosted composition failures remain visible and saved footage can be resumed without another worker render',async()=>{
+  const h=harness({env:{VIDEO_PROVIDER:'liteavatar_worker',STUDIO_WORKER_TOKEN:'worker-secret'.padEnd(32,'x')}});try{
+    const j={id:'worker-composition',identity:'worker-composition',parentId:h.parent.id,provider:'liteavatar_worker',status:'compositing',stage:'compositing',files:{original:true,voice:true},requests:{liteavatar:{id:'completed-worker-task',state:'completed'}},reviews:[]};h.service.save(j);
+    h.service.compose=async()=>{throw new Error('SOURCE_FRAMING_INCOMPATIBLE: fixture failure.');};
+    await assert.rejects(finishWorkerVideo(h.service,j),/fixture failure/);assert.equal(h.service.get(j.id).status,'needs_attention');assert.match(h.service.get(j.id).error,/fixture failure/);
+    h.service.compose=async()=>({passed:true,framingMode:'portrait_source_side_crop'});h.service.validate=async()=>{};j.status='compositing';j.error=null;h.service.save(j);h.service.resumeWorkerComposition(j);await idle(h.service,j.id);
+    const completed=h.service.get(j.id);assert.equal(completed.status,'visual_review');assert.equal(completed.files.video,true);assert.equal(completed.error,null);
   }finally{h.close();}
 });
 

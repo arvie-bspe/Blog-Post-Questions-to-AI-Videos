@@ -64,28 +64,49 @@ def main():
  # Solve one fixed crop against every tracked position. A median-only crop can
  # wrongly fail ordinary speaker movement, even when a slightly wider crop fits.
  all_faces=np.array(faces);centersx=all_faces[:,0]+all_faces[:,2]/2;centersy=all_faces[:,1]+all_faces[:,3]/2
- maximum=int(min(bottom-top,(right-left)*16/9)//32*32)
- candidates=sorted(range(160,maximum+1,32),key=lambda h:abs(h-fh/.25));chosen=None
- for ch in candidates:
-  cw=ch*9//16
-  if np.min(all_faces[:,3]/ch)<.18 or np.max(all_faces[:,3]/ch)>.34:continue
-  xmin=max(left,np.max(centersx)-.55*cw,np.max(all_faces[:,0]+all_faces[:,2])-cw)
-  xmax=min(right-cw,np.min(centersx)-.45*cw,np.min(all_faces[:,0]))
-  ymin=max(top,np.max(centersy)-.30*ch)
-  ymax=min(bottom-ch,np.min(centersy)-.19*ch,np.min(all_faces[:,1]-.25*all_faces[:,3]))
-  if np.ceil(xmin)>np.floor(xmax) or np.ceil(ymin)>np.floor(ymax):continue
-  x=int(np.clip(round(fx+fw/2-cw/2),np.ceil(xmin),np.floor(xmax)))
-  y=int(np.clip(round(fy+fh/2-ch*.275),np.ceil(ymin),np.floor(ymax)))
-  chosen=(x,y,cw,ch);break
+ chosen=None;framing_mode='tracked_scene_crop';center_limits=(.45,.55,.19,.30,.18,.34)
+ # LiteAvatar already returns a portrait studio frame. Preserve its complete
+ # height so the head and torso cannot be lost merely because a plain wall was
+ # excluded by the texture-based scene-bound estimator. Only the side margins
+ # are cropped, and every tracked face must remain inside that fixed crop.
+ source_ratio=width/max(1,height)
+ if 9/16-.005<=source_ratio<=.85:
+  ch=height-height%2;cw=int(ch*9/16);cw-=cw%2
+  if cw<=width:
+   pad=np.maximum(8,all_faces[:,2]*.08)
+   xmin=max(0,np.max(centersx)-.70*cw,np.max(all_faces[:,0]+all_faces[:,2]+pad)-cw)
+   xmax=min(width-cw,np.min(centersx)-.30*cw,np.min(all_faces[:,0]-pad))
+   safe_vertical=np.min(all_faces[:,1]-.25*all_faces[:,3])>=0
+   safe_size=np.min(all_faces[:,3]/ch)>=.08 and np.max(all_faces[:,3]/ch)<=.45
+   safe_y=np.min(centersy/ch)>=.08 and np.max(centersy/ch)<=.46
+   if safe_vertical and safe_size and safe_y and np.ceil(xmin)<=np.floor(xmax):
+    x=int(np.clip(round(fx+fw/2-cw/2),np.ceil(xmin),np.floor(xmax)));y=0
+    chosen=(x,y,cw,ch);left,top,right,bottom=0,0,width,height
+    framing_mode='portrait_source_side_crop';center_limits=(.30,.70,.08,.46,.08,.45)
+ if chosen is None:
+  maximum=int(min(bottom-top,(right-left)*16/9)//32*32)
+  candidates=sorted(range(160,maximum+1,32),key=lambda h:abs(h-fh/.25))
+  for ch in candidates:
+   cw=ch*9//16
+   if np.min(all_faces[:,3]/ch)<.18 or np.max(all_faces[:,3]/ch)>.34:continue
+   xmin=max(left,np.max(centersx)-.55*cw,np.max(all_faces[:,0]+all_faces[:,2])-cw)
+   xmax=min(right-cw,np.min(centersx)-.45*cw,np.min(all_faces[:,0]))
+   ymin=max(top,np.max(centersy)-.30*ch)
+   ymax=min(bottom-ch,np.min(centersy)-.19*ch,np.min(all_faces[:,1]-.25*all_faces[:,3]))
+   if np.ceil(xmin)>np.floor(xmax) or np.ceil(ymin)>np.floor(ymax):continue
+   x=int(np.clip(round(fx+fw/2-cw/2),np.ceil(xmin),np.floor(xmax)))
+   y=int(np.clip(round(fy+fh/2-ch*.275),np.ceil(ymin),np.floor(ymax)))
+   chosen=(x,y,cw,ch);break
  if chosen is None:raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: no single crop preserves the centered head and upper torso throughout the clip.')
  x,y,cw,ch=chosen
+ minx,maxx,miny,maxy,minh,maxh=center_limits
  protected=[]
  for ax,ay,aw,ah in faces:
   centerx=(ax+aw/2-x)/cw;centery=(ay+ah/2-y)/ch;faceheight=ah/ch
-  if not(.45<=centerx<=.55 and .19<=centery<=.30 and .18<=faceheight<=.34):raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: cannot preserve a centered head and upper-torso crop throughout the clip.')
+  if not(minx<=centerx<=maxx and miny<=centery<=maxy and minh<=faceheight<=maxh):raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: cannot preserve a centered head and upper-torso crop throughout the clip.')
   if ay-.25*ah<y or ax<x or ax+aw>x+cw:raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: cropping would cut the head.')
   protected.append([(ax-x)/cw-.03,(ay-y)/ch-.03,(ax+aw-x)/cw+.03,(ay+ah-y)/ch+.03])
- return {'crop':{'x':x,'y':y,'width':cw,'height':ch},'safeCropX':{'min':int(np.ceil(xmin)),'max':int(np.floor(xmax))},'sceneBounds':{'left':left,'top':top,'right':right,'bottom':bottom},'faceProtected':{'left':min(p[0] for p in protected),'top':min(p[1] for p in protected),'right':max(p[2] for p in protected),'bottom':max(p[3] for p in protected)},'framesInspected':frames,'faceDetectionMisses':misses,'texts':list(dict.fromkeys(texts)),'anatomicalReviewRequired':True,'ocrScope':'one source frame every two seconds; Macy must inspect the complete output'}
+ return {'crop':{'x':x,'y':y,'width':cw,'height':ch},'safeCropX':{'min':int(np.ceil(xmin)),'max':int(np.floor(xmax))},'sceneBounds':{'left':left,'top':top,'right':right,'bottom':bottom},'framingMode':framing_mode,'faceProtected':{'left':min(p[0] for p in protected),'top':min(p[1] for p in protected),'right':max(p[2] for p in protected),'bottom':max(p[3] for p in protected)},'framesInspected':frames,'faceDetectionMisses':misses,'texts':list(dict.fromkeys(texts)),'anatomicalReviewRequired':True,'ocrScope':'one source frame every two seconds; Macy must inspect the complete output'}
 
 if __name__=='__main__':
  try:

@@ -11,7 +11,7 @@ import {HeyGen,providerId} from './heygen.mjs';
 import {mediaTools,durationOf,compose} from './media.mjs';
 import {layoutVersion,detectorVersion} from './visual-checks.mjs';
 import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
-import {applyLocalVideoTask} from './local-video.mjs';
+import {applyLocalVideoTask,finishWorkerVideo} from './local-video.mjs';
 import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
 const error=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
@@ -28,7 +28,10 @@ export class VideoService {
     this.mediaReady=false;this.ready=this.media.check().then(()=>{this.mediaReady=true;}).catch(()=>{});
     this.logos=logos||new LogoService(dataDir);this.delivery=delivery||new DriveDelivery();this.onScriptChanges=onScriptChanges;this.revisions=new VideoRevisions(this);
     this.automation=new ApprovalVideoAutomation(this);
-    queueMicrotask(()=>{if(!this.closed)for(const j of this.list())if(j.status==='delivery_pending')this.deliver(j.id);});
+    queueMicrotask(()=>{if(!this.closed)for(const j of this.list()){
+      if(j.status==='delivery_pending')this.deliver(j.id);
+      else if(isWorkerVideoProvider(j.provider)&&j.status==='compositing'&&j.stage==='compositing'&&j.files?.original&&j.files?.voice&&!j.files?.video)this.resumeWorkerComposition(j);
+    }});
   }
   list(parent){const rows=parent?this.db.prepare('SELECT payload FROM videos WHERE parent=? ORDER BY updated DESC').all(parent):this.db.prepare('SELECT payload FROM videos ORDER BY updated DESC').all();return rows.map(r=>JSON.parse(r.payload));}
   get(id){const r=this.db.prepare('SELECT payload FROM videos WHERE id=?').get(id);return r?JSON.parse(r.payload):error('Video record not found.',404);}
@@ -71,6 +74,10 @@ export class VideoService {
     await this.checkFresh(parent,j.index);if(approved(this.store.get(j.parentId),j.index)!==j.approvalHash)error('The content review changed during this request.',409);
   }
   async applyWorkerTask(task){return applyLocalVideoTask(this,task);}
+  resumeWorkerComposition(j){
+    if(this.closed||this.active.has(j.id))return;this.active.add(j.id);j.error=null;this.save(j);
+    finishWorkerVideo(this,j).catch(()=>{}).finally(()=>this.active.delete(j.id));
+  }
   consume(){
     this.assertHeyGenEnabled();
     const limit=Number(this.env.DAILY_VIDEO_LIMIT||2);if(!Number.isInteger(limit)||limit<1||limit>20)error('DAILY_VIDEO_LIMIT must be an integer from 1 to 20.');
