@@ -10,8 +10,8 @@ import {prepare as prepareHeyGen,captionCase} from './heygen-domain.mjs';
 import {requireArticleIdentity} from './article-identity.mjs';
 import {recordQuestionReview} from './question-approval.mjs';
 import {matchingPresenter} from './presenter-compatibility.mjs';
-import {queueLocalReplacement} from './local-video.mjs';
-import {isWorkerVideoProvider} from './workflow-config.mjs';
+import {queueLocalReplacement,queueWorkerVideo} from './local-video.mjs';
+import {isWorkerVideoProvider,videoProvider} from './workflow-config.mjs';
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 export class VideoRevisions{
@@ -24,6 +24,12 @@ export class VideoRevisions{
       const parent=s.store.get(old.parentId);approved(parent,old.index);await s.checkFresh(parent);
       const current=s.store.get(parent.id);
       if(scriptText(current.plan.videos[old.index])!==old.script||current.doc.sourceHash!==old.source.sourceHash)fail('The script or source changed. Prepare a new setup from the current reviewed content.',409);
+      const currentProvider=videoProvider(s.env);
+      if(isWorkerVideoProvider(currentProvider)){
+        const replacement=await queueWorkerVideo(s,current,old.index,actor,currentProvider);
+        s.store.record(parent.id,actor,'replace_historical_heygen_with_current_worker');return replacement;
+      }
+      s.assertHeyGenEnabled();
       const data=prepareHeyGen(current,{index:old.index,thumbnailTitle:old.thumbnailTitle,presenterAccepted:true},old.avatar,old.voice);
       const existing=s.db.prepare('SELECT payload FROM videos WHERE identity=?').get(data.identity);if(existing)return JSON.parse(existing.payload);
       const j={...data,id:randomUUID(),created:now(),createdBy:actor,presenterAcceptedAt:old.presenterAcceptedAt,previousVideoId:old.id,replacementReason:'Preserve the complete source scene before Railway portrait framing.'};
@@ -69,7 +75,7 @@ export class VideoRevisions{
       if(body.decision==='approve'&&(!body.checkedFraming||!body.checkedNoNap||!body.checkedEndCard))fail('Confirm full-frame upper-torso framing, clean-logo/no-contact speech frames, and the separate white end card.');
       if(body.decision==='approve'&&j.provider==='liteavatar_worker'&&j.avatar?.rightsStatus==='evaluation_only'&&s.env.LITEAVATAR_ASSET_RIGHTS_CONFIRMED!=='true')fail('This trial avatar is approved for internal evaluation only. Confirm commercial rights and set LITEAVATAR_ASSET_RIGHTS_CONFIRMED=true before Drive delivery.',409);
       if(body.decision==='reject'&&body.changeType==='layout')visualSettings(body.visualSettings);
-      if(body.decision==='reject'&&body.changeType==='render'&&(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate))fail('Accept the displayed generation cost estimate before requesting this change.');
+      if(body.decision==='reject'&&body.changeType==='render'&&!isWorkerVideoProvider(videoProvider(s.env))&&(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate))fail('Accept the displayed generation cost estimate before requesting this change.');
       j.reviews.push({actor,at:now(),decision:body.decision,note:body.note.trim(),checkedVideo:!!body.checkedVideo,checkedCaptions:!!body.checkedCaptions,checkedContacts:!!body.checkedContacts,checkedFraming:!!body.checkedFraming,checkedNoNap:!!body.checkedNoNap,checkedEndCard:!!body.checkedEndCard,authenticated:!s.local,outputRevision:j.outputRevision||1});
       if(body.decision==='approve'){j.status='delivery_pending';j.error=null;s.save(j);s.manifest(j);s.deliver(j.id);return s.get(j.id);}
       j.status='revision_pending';j.revisionRequest={actor,note:body.note.trim(),type:body.changeType||'manual',status:'pending',at:now()};s.save(j);s.store.record(j.parentId,actor,'video_revision_requested');
@@ -94,8 +100,14 @@ export class VideoRevisions{
       (async()=>{if(body.refreshLogo)await s.ensureLogo(j,true);await s.work(j);})().catch(e=>{if(!s.closed){j.status='needs_attention';j.error=e.message;j.revisionRequest.status='failed';s.save(j);}}).finally(()=>s.active.delete(id));return j;
     }
     if(type==='render'){
+      const currentProvider=videoProvider(s.env);
+      if(isWorkerVideoProvider(j.provider)&&j.provider===currentProvider)return await queueLocalReplacement(s,j,actor);
+      if(isWorkerVideoProvider(currentProvider)){
+        const parent=s.store.get(j.parentId),replacement=await queueWorkerVideo(s,parent,j.index,actor,currentProvider);
+        j.status='changes_requested';j.revisionRequest.status='replacement_started';j.revisionRequest.replacementId=replacement.id;s.save(j);return s.get(replacement.id);
+      }
+      s.assertHeyGenEnabled();
       if(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate)fail('Accept the displayed generation estimate before creating a replacement.');
-      if(isWorkerVideoProvider(j.provider))return await queueLocalReplacement(s,j,actor);
       let voice=body.voiceId?s.voices.get(body.voiceId):j.voice;if(!voice)fail('Select an available English voice from the library.');
       voice=matchingPresenter(j.avatar,voice).voice;
       const replacement={...structuredClone(j),id:randomUUID(),identity:hash([j.id,'requested_replacement',j.revisionRequest.at]),voice:{id:voice.id,name:voice.name,language:voice.language,gender:voice.gender},previousVideoId:j.id,generationVersion:(j.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,authorization:null,automation:null};

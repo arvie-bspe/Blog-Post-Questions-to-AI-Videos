@@ -34,8 +34,10 @@ export class VideoService {
   get(id){const r=this.db.prepare('SELECT payload FROM videos WHERE id=?').get(id);return r?JSON.parse(r.payload):error('Video record not found.',404);}
   save(j){j.updated=now();this.db.prepare('INSERT INTO videos VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated,payload=excluded.payload').run(j.id,j.identity,j.parentId,j.updated,JSON.stringify(j));return j;}
   directory(j){const dir=join(this.dataDir,'videos',j.id);mkdirSync(dir,{recursive:true});return dir;}
+  assertHeyGenEnabled(){if(videoProvider(this.env)!=='heygen')error('HeyGen API generation is disabled while the Railway LiteAvatar CPU provider is active.',409);}
   async catalog(){await this.ready;const provider=videoProvider(this.env),worker=isWorkerVideoProvider(provider),lite=provider==='liteavatar_worker';return {backend:lite?'Railway CPU · Kokoro + LiteAvatar':worker?'Private worker · Kokoro + SadTalker':'HeyGen',provider,configured:worker?Boolean(this.env.STUDIO_WORKER_TOKEN):Boolean(this.env.HEYGEN_API_KEY),ffmpeg:this.mediaReady,prices:worker?{currency:'USD',providerCharge:0,hosting:'Railway usage'}:prices,targetSeconds:30,nativeResolution:worker?'Worker generated':'1080p',outputResolution:'1080 × 1920',aspectRatio:'9:16',layoutVersion,detectorVersion,endCardSeconds:3,logoRequired:true,presenterMode:lite?'Approved LiteAvatar trial profile':worker?'Approved local presenter image':'HeyGen Studio Avatar',dailyLimit:worker?null:Number(this.env.DAILY_VIDEO_LIMIT||2)};}
   async library(kind,type='studio_avatar',token=''){
+    this.assertHeyGenEnabled();
     if(!['avatars','voices'].includes(kind)||type!=='studio_avatar'||typeof token!=='string'||token.length>2048)error('Use the Studio Avatar library; Photo Avatars are disabled.');
     if(!this.env.HEYGEN_API_KEY)error('Add HEYGEN_API_KEY privately in Railway Variables to load presenters and voices.');
     const key=JSON.stringify([kind,type,token]),cached=this.pages.get(key);if(cached&&cached.expires>Date.now())return cached.page;
@@ -70,12 +72,14 @@ export class VideoService {
   }
   async applyWorkerTask(task){return applyLocalVideoTask(this,task);}
   consume(){
+    this.assertHeyGenEnabled();
     const limit=Number(this.env.DAILY_VIDEO_LIMIT||2);if(!Number.isInteger(limit)||limit<1||limit>20)error('DAILY_VIDEO_LIMIT must be an integer from 1 to 20.');
     const day=now().slice(0,10);this.db.prepare('INSERT INTO video_spend(day,stage,count) VALUES(?,?,1) ON CONFLICT(day,stage) DO UPDATE SET count=count+1 WHERE count<?').run(day,'heygen_render',limit);
     if(!this.db.prepare('SELECT changes() AS n').get().n)error('The daily HeyGen request limit has been reached.');
   }
   async create(parentId,body,actor){
     if(!['Arvie','Macy'].includes(actor))error('Arvie or Macy prepares videos.',403);
+    this.assertHeyGenEnabled();
     const parent=this.store.get(parentId);approved(parent,body.index);await this.checkFresh(parent,body.index);
     const data=prepare(this.store.get(parentId),body,this.avatars.get(body.avatarId),this.voices.get(body.voiceId));
     const existing=this.db.prepare('SELECT payload FROM videos WHERE identity=?').get(data.identity);if(existing)return publicJob(JSON.parse(existing.payload));
@@ -83,6 +87,7 @@ export class VideoService {
   }
   async start(id,action,body,actor){
     if(!['Arvie','Macy'].includes(actor))error('Arvie or Macy manages video creation.',403);
+    this.assertHeyGenEnabled();
     if(this.active.has(id))error('This video is already processing.',409);this.active.add(id);
     try{
       const j=this.get(id);await this.validate(j);
@@ -110,6 +115,7 @@ export class VideoService {
     }catch(e){this.active.delete(id);throw e;}
   }
   async queued(j){
+    this.assertHeyGenEnabled();
     let request=j.requests.video;
     if(request?.state==='submitting'&&!request.id)throw new Error('Submission outcome is unknown. Check HeyGen using this setup ID; do not resubmit.');
     if(!request){
@@ -188,6 +194,7 @@ export class VideoService {
     if(path==='/api/video-library'&&req.method==='GET'){send(res,200,await this.library(url.searchParams.get('kind'),url.searchParams.get('type')||'studio_avatar',url.searchParams.get('token')||''));return true;}
     const preview=path.match(/^\/api\/video-preview\/(avatars|voices)\/([-A-Za-z0-9_]+)$/);
     if(preview&&req.method==='GET'){
+      this.assertHeyGenEnabled();
       const item=(preview[1]==='avatars'?this.avatars:this.voices).get(preview[2]);if(!item?.previewURL)error('Reload the presenter library to refresh this preview.',404);
       const result=await this.heygen.bytes(item.previewURL,8*1024*1024);
       if(!(preview[1]==='avatars'?['image/jpeg','image/png','image/webp']:['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/mp4']).includes(result.type))error('HeyGen returned an unsupported preview format.',502);

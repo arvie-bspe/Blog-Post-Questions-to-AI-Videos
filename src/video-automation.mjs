@@ -85,7 +85,10 @@ export class ApprovalVideoAutomation {
       const parent=service.store.get(entry.parent);if(approved(parent,entry.index)!==entry.approvalHash)throw new Error('This question or its review changed. A new individual approval is required.');
       await service.checkFresh(parent,entry.index);entry.status='working';entry.error=null;this.save(entry);
       const provider=videoProvider(service.env);
-      if(parent.mode==='direct_google'&&isWorkerVideoProvider(provider)){
+      // The selected provider is authoritative for every saved article mode.
+      // Historical live_google records must never fall through to a paid
+      // provider after the workspace switches to a self-hosted worker.
+      if(isWorkerVideoProvider(provider)){
         const local=await queueWorkerVideo(service,parent,entry.index,entry.triggeredBy,provider);entry.videos=[local.id];entry.selection={avatar:local.avatar,voice:local.voice,selection:{method:provider==='liteavatar_worker'?'liteavatar_cpu_trial_profiles':'approved_local_assets'}};entry.status='submitted';entry.error=null;this.save(entry);return;
       }
       const prior=await this.reuse(parent,entry.index,entry.approvalHash);

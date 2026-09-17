@@ -73,6 +73,21 @@ test('mismatched manual profiles and saved setups cannot consume the daily allow
  }finally{h.close();}
 });
 
+test('LiteAvatar selection blocks every HeyGen spend path and routes historical live Google approvals to the CPU worker',async()=>{
+  let providerCalls=0;const queued=[],h=harness({env:{HEYGEN_API_KEY:'still-present-but-disabled',VIDEO_PROVIDER:'liteavatar_worker',STUDIO_WORKER_TOKEN:'worker-secret'.padEnd(32,'x')},heygen:{looks:async()=>{providerCalls++;return {data:[]};},submit:async()=>{providerCalls++;throw new Error('HeyGen must not be called.');}}});
+  try{
+    h.parent.mode='live_google';h.store.save(h.parent);h.service.tasks={enqueue:task=>{queued.push(task);return {id:'liteavatar-task-'+queued.length,status:'queued'};}};
+    await assert.rejects(h.service.library('avatars'),/HeyGen API generation is disabled/);
+    await assert.rejects(h.service.create(h.parent.id,hgSettings,'Arvie'),/HeyGen API generation is disabled/);
+    const legacy={...prepareHeyGen(h.parent,hgSettings,avatar,voice),id:'historical-heygen-ready',identity:'historical-heygen-ready',created:new Date().toISOString(),status:'prepared'};h.service.save(legacy);
+    await assert.rejects(h.service.start(legacy.id,'render',{acceptCost:true,acceptedEstimate:legacy.renderEstimate},'Arvie'),/HeyGen API generation is disabled/);
+    h.service.automation.enqueue(h.parent.id,'Keziah',0);
+    let run;for(let i=0;i<100;i++){run=h.service.automation.view(h.parent.id).lastRun;if(run?.status==='submitted')break;await new Promise(r=>setTimeout(r,10));}
+    assert.equal(run?.status,'submitted',run?.error);assert.equal(queued.length,1);assert.equal(queued[0].type,'media_liteavatar');
+    const generated=h.service.get(run.videos[0]);assert.equal(generated.provider,'liteavatar_worker');assert.equal(generated.renderEstimate,0);assert.equal(providerCalls,0);
+  }finally{h.close();}
+});
+
 test('HeyGen request binds approved text and public presenter without an image or separate voice request',()=>{
   const h=harness();try{
     const j=prepareHeyGen(h.parent,hgSettings,avatar,voice);j.id='test-uuid';const body=requestBody(j);
