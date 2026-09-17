@@ -34,6 +34,11 @@ export class TaskQueue{
   row(r){if(!r)return null;const {lease_token,lease_owner,lease_until,applied_at,...rest}=r;return {...rest,leaseToken:lease_token,leaseOwner:lease_owner,leaseUntil:lease_until,appliedAt:applied_at,payload:JSON.parse(r.payload),result:r.result?JSON.parse(r.result):null};}
   get(id){return this.row(this.db.prepare('SELECT * FROM worker_tasks WHERE id=?').get(id));}
   list(subject){return this.db.prepare('SELECT * FROM worker_tasks WHERE subject=? ORDER BY created DESC').all(subject).map(r=>publicTask(this.row(r)));}
+  supersedeQueued(subject,keepId){
+    const at=now(),message='Superseded by the current saved analysis task.';
+    this.db.prepare("UPDATE worker_tasks SET status='failed',error=?,applied_at=?,available_at=NULL,updated=? WHERE subject=? AND status='queued' AND id<>?").run(message,at,at,subject,keepId);
+    return this.list(subject);
+  }
   reclaimExpired(){const at=now();this.db.prepare("UPDATE worker_tasks SET status=CASE WHEN attempts>=max_attempts THEN 'failed' ELSE 'queued' END,error=CASE WHEN attempts>=max_attempts THEN 'Worker lease expired too many times.' ELSE error END,available_at=CASE WHEN attempts>=max_attempts THEN NULL ELSE ? END,lease_token=NULL,lease_owner=NULL,lease_until=NULL,updated=? WHERE status='working' AND lease_until<?").run(at,at,at);}
   enqueue({type,subject,payload,priority=50,idempotencyKey,maxAttempts=3}){
     if(!/^[a-z][a-z0-9_]{2,40}$/.test(type)||typeof subject!=='string'||!subject)fail('Invalid worker task.');

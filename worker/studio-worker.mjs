@@ -31,7 +31,7 @@ async function media(task,dir){
   const lite=task.type==='media_liteavatar',python=lite?process.env.LITEAVATAR_PYTHON:process.env.LOCAL_MEDIA_PYTHON,script=lite?'liteavatar-media.py':'local-media.py';
   await run(python||'python',[join(root,'worker',script),'render','--task',input,'--output',out],{cwd:root,timeout});
   for(const [name,type]of [['voice.wav','audio/wav'],['presenter.mp4','video/mp4'],['alignment.json','application/json']]){const path=join(out,name);if(!existsSync(path))throw new Error(`Local media renderer did not create ${name}.`);await upload(task,name,path,type);}
-  return {engine:lite?'kokoro-onnx+liteavatar-cpu':'kokoro-onnx+sadtalker',alignment:'kokoro-duration',completedAt:new Date().toISOString()};
+  return {engine:lite?'kokoro-onnx+liteavatar-cpu-natural-v2':'kokoro-onnx+sadtalker',alignment:'kokoro-duration',completedAt:new Date().toISOString()};
 }
 async function liteAvatarSmoke(){
   const dir=mkdtempSync(join(tmpdir(),'liteavatar-smoke-')),input=join(dir,'task.json'),out=join(dir,'media');

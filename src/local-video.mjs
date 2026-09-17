@@ -13,7 +13,7 @@ import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
 const now=()=>new Date().toISOString();
 const modes={
   local_worker:{avatarType:'local_image',taskType:'media_local',requestKey:'local',stage:'local_render',models:{speech:'Kokoro-82M ONNX',video:'SadTalker',alignment:'Kokoro duration output'},engines:{speech:'kokoro-onnx',animation:'sadtalker',alignment:'kokoro-duration'}},
-  liteavatar_worker:{avatarType:'liteavatar_profile',taskType:'media_liteavatar',requestKey:'liteavatar',stage:'liteavatar_render',models:{speech:'Kokoro-82M ONNX FP32',video:'LiteAvatar CPU',alignment:'Kokoro duration output'},engines:{speech:'kokoro-onnx-fp32',animation:'liteavatar-cpu',alignment:'kokoro-duration'}}
+  liteavatar_worker:{avatarType:'liteavatar_profile',taskType:'media_liteavatar',requestKey:'liteavatar',stage:'liteavatar_render',models:{speech:'Kokoro-82M ONNX FP32',video:'LiteAvatar CPU natural motion v2',alignment:'Kokoro duration output'},engines:{speech:'kokoro-onnx-fp32',animation:'liteavatar-cpu-natural-v2',alignment:'kokoro-duration'}}
 };
 const mode=provider=>{if(!isWorkerVideoProvider(provider)||!modes[provider])throw new Error(`Unsupported self-hosted video provider: ${provider}`);return modes[provider];};
 export const localAvatar=presenterPool.avatars.find(a=>a.id==='local-studio-presenter-01');
@@ -53,7 +53,7 @@ async function enqueueWorkerRecord(service,data,parent,actor){
 }
 
 export async function queueLocalReplacement(service,old,actor){
-  const parent=service.store.get(old.parentId),replacement={...structuredClone(old),id:randomUUID(),identity:hash([old.id,`${old.provider}_replacement`,now()]),previousVideoId:old.id,generationVersion:(old.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,technicalQA:null,workerTaskId:null};
+  const parent=service.store.get(old.parentId),selected=mode(old.provider),replacement={...structuredClone(old),id:randomUUID(),identity:hash([old.id,`${old.provider}_replacement`,now()]),previousVideoId:old.id,generationVersion:(old.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,technicalQA:null,workerTaskId:null,models:selected.models,motionTuning:old.provider==='liteavatar_worker'?'mouth-lowpass-7hz; pause-closure-200ms':null};
   service.save(replacement);old.status='changes_requested';if(old.revisionRequest){old.revisionRequest.status='replacement_started';old.revisionRequest.replacementId=replacement.id;}service.save(old);await service.ensureLogo(replacement);return enqueueWorkerRecord(service,replacement,parent,actor);
 }
 

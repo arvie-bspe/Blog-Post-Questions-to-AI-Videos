@@ -61,6 +61,11 @@ RUN set -eux; \
 # dataset and training stack.
 RUN python -c "from pathlib import Path; p=Path('/opt/lite-avatar/funasr_local/utils/asr_utils.py'); s=p.read_text(); old='from modelscope.utils.logger import get_logger'; new='import logging\\nget_logger = lambda: logging.getLogger(__name__)'; assert old in s; p.write_text(s.replace(old, new, 1))"
 
+# Smooth rapid mouth-shape changes and return to the neutral pose during normal
+# sentence pauses. These values tune the pinned upstream CPU model; they do not
+# shift the audio track or add any paid media service.
+RUN python -c "from pathlib import Path; p=Path('/opt/lite-avatar/audio2mouth_cpu.py'); s=p.read_text(); old='order=4, cutoff=10, fs=30'; new='order=4, cutoff=7, fs=30'; assert old in s; p.write_text(s.replace(old, new, 1)); p=Path('/opt/lite-avatar/lite_avatar.py'); s=p.read_text(); old='detect_silence(sound, 500, -50)'; new='detect_silence(sound, 200, -50)'; assert old in s; p.write_text(s.replace(old, new, 1))"
+
 COPY --from=dependencies /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 WORKDIR /app

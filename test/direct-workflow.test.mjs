@@ -8,6 +8,7 @@ import {validateDirectPlan} from '../src/domain.mjs';
 import {DirectAIResolver,directInstructions} from '../src/direct-ai.mjs';
 import {TaskQueue} from '../src/task-queue.mjs';
 import {Store} from '../src/store.mjs';
+import {ScriptWorkflow} from '../src/script-workflow.mjs';
 import {prepareLocal,prepareWorkerVideo} from '../src/local-video.mjs';
 import {recordQuestionReview} from '../src/question-approval.mjs';
 import {directMode,scriptPolicyHash} from '../src/workflow-config.mjs';
@@ -37,7 +38,22 @@ test('Codex resolver creates a provider-neutral durable task',()=>{
   const calls=[],tasks={enqueue:value=>{calls.push(value);return {id:'task-1',status:'queued'};}},resolver=new DirectAIResolver({env:{AI_PROVIDER:'codex_worker',STUDIO_WORKER_TOKEN:'x'.repeat(32)},tasks});
   const job={id:'job-1',doc:{sourceHash:'source',paragraphs:[]},client:{},plan:null,maxVideos:2};
   const result=resolver.submit(job);
-  assert.equal(result.provider,'codex_worker');assert.equal(calls[0].type,'ai_codex');assert.equal(calls[0].payload.context.sourceHash,'source');assert.equal(calls[0].payload.outputSchema.additionalProperties,false);
+  assert.equal(result.provider,'codex_worker');assert.equal(calls[0].type,'ai_codex');assert.match(calls[0].idempotencyKey,/^[a-f0-9]{64}$/);assert.equal(calls[0].payload.context.sourceHash,'source');assert.equal(calls[0].payload.outputSchema.additionalProperties,false);
+});
+
+test('a queued Codex draft survives a Railway restart and duplicate retries are suppressed',async()=>{
+  const dir=mkdtempSync(join(tmpdir(),'direct-recovery-')),store=new Store(join(dir,'studio.sqlite'));
+  try{
+    const queue=new TaskQueue({db:store.db,dataDir:dir,env:{STUDIO_WORKER_TOKEN:'secret-'.padEnd(32,'x')}}),resolver=new DirectAIResolver({env:{AI_PROVIDER:'codex_worker',STUDIO_WORKER_TOKEN:'secret-'.padEnd(32,'x')},tasks:queue});
+    const job=store.create({identity:'recover-direct',mode:directMode,status:'inspected',doc:{sourceHash:'source',paragraphs:[]},client:{},row:{},maxVideos:2});
+    for(let attempt=1;attempt<=4;attempt++){job.analysisAttempt=attempt;const submitted=resolver.submit(job);job.analysisTaskId=submitted.task.id;}
+    job.status='interrupted';job.error='The application restarted during analysis.';job.revisionRequest={status:'working'};store.save(job);
+    const workflow=new ScriptWorkflow({store,env:{AI_PROVIDER:'codex_worker',STUDIO_WORKER_TOKEN:'secret-'.padEnd(32,'x'),DAILY_ANALYSIS_LIMIT:'10'},checkFresh:async()=>assert.fail('A saved pending task must be reused.'),directResolver:resolver});
+    workflow.recoverPendingTasks();
+    let current=store.get(job.id);assert.equal(current.status,'analyzing');assert.equal(current.error,null);
+    const tasks=queue.list(job.id+':analysis');assert.equal(tasks.filter(task=>task.status==='queued').length,1);assert.equal(tasks.filter(task=>task.status==='failed').length,3);
+    const before=tasks.length;current=await workflow.startDirect(job.id);assert.equal(current.analysisTaskId,job.analysisTaskId);assert.equal(queue.list(job.id+':analysis').length,before);assert.equal(store.db.prepare('SELECT count(*) n FROM usage').get().n,0);
+  }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
 
 test('worker queue leases once, records heartbeats, and applies one completion',async()=>{
@@ -72,7 +88,7 @@ test('approved direct script prepares a zero-provider-charge local video with ma
     const job=store.create({identity:'local-direct',mode:directMode,scriptRulesHash:scriptPolicyHash,rulesHash:'appearance',doc,plan,row:{documentUrl:'https://docs.google.com/document/d/direct-doc-123/edit',pageUrl:'https://example.com/article',folderUrl:'https://drive.google.com/drive/folders/folder123'},client:{key:'Example',name:'Example Law Firm',homepage:'https://example.com'},setupIssues:[],questionReviews:[],reviews:[]});
     recordQuestionReview(job,0,{actor:'Keziah',decision:'approve',note:'Evidence and wording checked.',checkedEvidence:true,checkedWarnings:true,at:new Date().toISOString()});store.save(job);
     const video=prepareLocal(job,0);assert.equal(video.provider,'local_worker');assert.equal(video.renderEstimate,0);assert.equal(video.avatar.gender,video.voice.gender);assert.equal(video.script,'How does filing work?\n\nThe firm files the form electronically.');
-    const lite=prepareWorkerVideo(job,0,'liteavatar_worker');assert.equal(lite.provider,'liteavatar_worker');assert.equal(lite.models.video,'LiteAvatar CPU');assert.equal(lite.avatar.type,'liteavatar_profile');assert.equal(lite.avatar.gender,lite.voice.gender);assert.equal(lite.avatar.gender,'male');assert.equal(lite.renderEstimate,0);
+    const lite=prepareWorkerVideo(job,0,'liteavatar_worker');assert.equal(lite.provider,'liteavatar_worker');assert.equal(lite.models.video,'LiteAvatar CPU natural motion v2');assert.equal(lite.avatar.type,'liteavatar_profile');assert.equal(lite.avatar.gender,lite.voice.gender);assert.equal(lite.avatar.gender,'male');assert.equal(lite.renderEstimate,0);
     const femaleJob=structuredClone(job);femaleJob.id='female-direct';femaleJob.plan.presenterContext.gender='female';femaleJob.questionReviews=[];recordQuestionReview(femaleJob,0,{actor:'Keziah',decision:'approve',note:'Female presenter context and evidence checked.',checkedEvidence:true,checkedWarnings:true,at:new Date().toISOString()});const female=prepareWorkerVideo(femaleJob,0,'liteavatar_worker');assert.equal(female.avatar.gender,'female');assert.equal(female.voice.gender,'female');assert.equal(female.voice.id,'af_heart');
   }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });

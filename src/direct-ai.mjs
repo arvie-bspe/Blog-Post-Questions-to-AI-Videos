@@ -1,4 +1,4 @@
-import {validateDirectPlan} from './domain.mjs';
+import {hash,validateDirectPlan} from './domain.mjs';
 import {aiProvider,scriptPolicyVersion} from './workflow-config.mjs';
 
 const str={type:'string'},strings={type:'array',items:str};
@@ -53,7 +53,10 @@ export class DirectAIResolver{
   configured(){const provider=this.provider();return provider==='codex_worker'?Boolean(this.env.STUDIO_WORKER_TOKEN):Boolean(this.env.ANTHROPIC_API_KEY&&this.env.CLAUDE_MODEL);}
   submit(job,args={}){
     const provider=this.provider(),payload={...directTaskPayload(job,args),context:{jobId:job.id,index:Number.isInteger(args.index)?args.index:null,draftHash:args.draftHash||null,sourceHash:job.doc.sourceHash}},subject=job.id+(Number.isInteger(args.index)?`:question:${args.index}`:':analysis');
-    if(provider==='codex_worker')return {provider,task:this.tasks.enqueue({type:'ai_codex',subject,payload,priority:10})};
+    if(provider==='codex_worker'){
+      const attempt=args.attemptToken??job.analysisAttempt??0;
+      return {provider,task:this.tasks.enqueue({type:'ai_codex',subject,payload,priority:10,idempotencyKey:hash(['ai_codex',subject,job.doc.sourceHash,args.draftHash||'',args.feedback||'',attempt])})};
+    }
     return {provider,promise:claudeJSON(payload,this.env,this.fetcher)};
   }
 }

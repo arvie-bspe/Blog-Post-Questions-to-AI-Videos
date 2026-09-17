@@ -5,6 +5,20 @@ import {directMode} from './workflow-config.mjs';
 import {validateDirectResult} from './direct-ai.mjs';
 export class ScriptWorkflow{
   constructor({store,env,checkFresh,analyzer=analyze,directResolver=null}){Object.assign(this,{store,env,checkFresh,analyzer,directResolver});this.active=new Set();}
+  recoverPendingTasks(){
+    if(!this.directResolver?.tasks)return;
+    for(const job of this.store.list()){
+      if(job.mode!==directMode||!job.analysisTaskId)continue;
+      const task=this.directResolver.tasks.get(job.analysisTaskId),subject=job.id+':analysis';
+      if(!task)continue;
+      this.directResolver.tasks.supersedeQueued(subject,task.id);
+      if(['queued','working'].includes(task.status)||task.status==='completed'&&!task.appliedAt){
+        job.status='analyzing';job.error=null;job.revisionRequest={...(job.revisionRequest||{}),status:'working'};this.store.save(job);
+      }else if(task.status==='failed'){
+        job.status='failed';job.error=task.error||'The saved AI task failed. Retry once the worker is available.';job.revisionRequest={...(job.revisionRequest||{}),status:'failed'};this.store.save(job);
+      }
+    }
+  }
   async start(id,feedback='',index){
     const source=this.store.get(id);if(source?.mode===directMode)return this.startDirect(id,feedback,index);
     if(Number.isInteger(index))return this.startQuestion(id,feedback,index);
@@ -23,6 +37,13 @@ export class ScriptWorkflow{
     if(!this.directResolver)throw new Error('The direct-document AI resolver is unavailable.');
     if(!this.directResolver.configured())throw new Error(this.directResolver.provider()==='codex_worker'?'The local Codex worker connection is not configured.':'Claude is not configured.');
     const job=this.store.get(id),scoped=Number.isInteger(index),key=scoped?id+':'+index:id;
+    if(!scoped&&job.analysisTaskId){
+      const pending=this.directResolver.tasks?.get(job.analysisTaskId);
+      if(pending&&pending.payload?.context?.sourceHash===job.doc.sourceHash&&(['queued','working'].includes(pending.status)||pending.status==='completed'&&!pending.appliedAt)){
+        this.directResolver.tasks.supersedeQueued(job.id+':analysis',pending.id);
+        job.status='analyzing';job.error=null;job.revisionRequest={...(job.revisionRequest||{}),status:'working'};return this.store.save(job);
+      }
+    }
     if(this.active.has(key)||!scoped&&job.status==='analyzing')throw Object.assign(new Error('Script analysis is already running.'),{status:409});
     await this.checkFresh(job,scoped?index:undefined);
     const limit=Number(this.env.DAILY_ANALYSIS_LIMIT||10);if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid daily analysis limit.');this.store.consume(limit);
@@ -30,15 +51,16 @@ export class ScriptWorkflow{
     if(scoped){
       const state=questionState(job,index);feedback=[...new Set([...state.reviews.filter(r=>r.decision==='reject').map(r=>r.note),feedback].filter(Boolean))].join('\n\n');
       const previousPlan={...job.plan,videos:[job.plan.videos[index]],skipped:[]};
-      job.questionRequests={...(job.questionRequests||{}),[index]:{index,draftHash:state.draftHash,feedback,status:'working',provider,at:new Date().toISOString()}};this.store.save(job);
-      const submitted=this.directResolver.submit(job,{previousPlan,feedback,onlyQuestion:job.plan.videos[index].question,index,draftHash:state.draftHash,maxVideos:1});
+      const previousAttempt=job.questionRequests?.[index]?.attempt||0,attempt=previousAttempt+1;
+      job.questionRequests={...(job.questionRequests||{}),[index]:{index,draftHash:state.draftHash,feedback,status:'working',provider,attempt,at:new Date().toISOString()}};this.store.save(job);
+      const submitted=this.directResolver.submit(job,{previousPlan,feedback,onlyQuestion:job.plan.videos[index].question,index,draftHash:state.draftHash,maxVideos:1,attemptToken:attempt});
       if(submitted.task){job.questionRequests[index].taskId=submitted.task.id;this.store.save(job);}else this.finishDirectPromise(submitted.promise,{jobId:id,index,draftHash:state.draftHash});
       return job;
     }
     feedback=[...new Set([...(job.reviews||[]).filter(r=>r.decision==='reject').map(r=>r.note),feedback].filter(Boolean))].join('\n\n');
     const previousPlan=job.plan?structuredClone(job.plan):null;
     if(job.plan)job.history=[...(job.history||[]),{at:job.updated,plan:job.plan,reviews:job.reviews,origin:job.origin,audit:job.audit,validation:job.validation,revision:job.revision}];
-    job.status='analyzing';job.reviews=[];job.questionReviews=[];job.plan=null;job.error=null;job.origin=provider==='codex_worker'?'Local Codex worker draft with source audit':'Claude API draft with source audit';job.revisionRequest={feedback,status:'working',provider,at:new Date().toISOString()};this.store.save(job);
+    job.status='analyzing';job.reviews=[];job.questionReviews=[];job.plan=null;job.error=null;job.analysisAttempt=(job.analysisAttempt||0)+1;job.origin=provider==='codex_worker'?'Local Codex worker draft with source audit':'Claude API draft with source audit';job.revisionRequest={feedback,status:'working',provider,at:new Date().toISOString()};this.store.save(job);
     const submitted=this.directResolver.submit(job,{previousPlan,feedback,maxVideos:job.maxVideos||2});
     if(submitted.task){job.analysisTaskId=submitted.task.id;this.store.save(job);}else this.finishDirectPromise(submitted.promise,{jobId:id});
     return job;
