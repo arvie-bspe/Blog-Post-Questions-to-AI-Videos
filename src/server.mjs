@@ -23,7 +23,7 @@ import {questionState,questionHash,recordQuestionReview} from './question-approv
 import {presenterIssue} from './presenter-compatibility.mjs';
 import {TaskQueue} from './task-queue.mjs';
 import {DirectAIResolver} from './direct-ai.mjs';
-import {directMode,directSetupIssues,scriptPolicyHash,scriptPolicyVersion,workflowVersion,aiProvider,videoProvider,workerConfigured} from './workflow-config.mjs';
+import {directMode,directSetupIssues,scriptPolicyHash,scriptPolicyVersion,workflowVersion,aiProvider,videoProvider,isWorkerVideoProvider,workerConfigured} from './workflow-config.mjs';
 const file=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const fixture=name=>{try{return JSON.parse(file('../fixtures/'+name+'.json'));}catch(e){if(e.code==='ENOENT')return null;throw e;}};
 const fixtures=Object.fromEntries(['paul','roman'].map(name=>[name,fixture(name)]).filter(([,doc])=>doc));
@@ -52,7 +52,7 @@ export function createApp(env=process.env){
   const send=(res,status,value,type='application/json; charset=utf-8')=>{if(type.startsWith('application/json')&&value?.plan?.videos)value={...value,questionStates:value.plan.videos.map((_,i)=>questionState(value,i))};res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'Referrer-Policy':'no-referrer'});res.end(type.startsWith('application/json')?JSON.stringify(value):value);};
   const json=async(req,max=32768)=>{if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']||''))fail('JSON body required.',415);let text='';for await(const chunk of req){text+=chunk;if(Buffer.byteLength(text)>max)fail('Request is too large.',413);}try{return JSON.parse(text);}catch{fail('Invalid JSON.');}};
   const load=id=>store.get(id)||fail('Review record not found.',404);
-  const currentVideo=v=>{try{const parent=store.get(v.parentId),expected=parent.mode===directMode?appearanceRulesHash:rulesHash;return !presenterIssue(v.avatar,v.voice)&&(!v.files?.video||v.detectorVersion===config.video.faceDetectorVersion)&&v.layoutVersion===config.video.layoutVersion&&v.source?.rulesHash===expected&&v.approvalHash===approved(parent,v.index);}catch{return false;}};
+  const currentVideo=v=>{try{const parent=store.get(v.parentId),expected=isWorkerVideoProvider(v.provider)||parent.mode===directMode?appearanceRulesHash:rulesHash,active=['prepared','working','compositing','visual_review','delivery_pending','delivered'].includes(v.status);return active&&v.provider===videoProvider(env)&&!presenterIssue(v.avatar,v.voice)&&(!v.files?.video||v.detectorVersion===config.video.faceDetectorVersion)&&v.layoutVersion===config.video.layoutVersion&&v.source?.rulesHash===expected&&v.approvalHash===approved(parent,v.index);}catch{return false;}};
   const assertCurrent=job=>{if(load(job.id).revision!==job.revision)fail('This record changed in another request. Reload before continuing.',409);};
   async function checkFresh(job,index){
     if(job.mode===directMode){
