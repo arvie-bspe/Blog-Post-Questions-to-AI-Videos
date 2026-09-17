@@ -56,6 +56,11 @@ RUN set -eux; \
     mv /tmp/liteavatar/female/P1sYK8Nw7lTesGSjNMhz8Ntw /opt/lite-avatar-profiles/professional-female-01; \
     rm -rf /tmp/liteavatar
 
+# LiteAvatar's vendored FunASR imports ModelScope only to construct a logger.
+# Use the standard logger so the CPU worker does not carry ModelScope's unused
+# dataset and training stack.
+RUN python -c "from pathlib import Path; p=Path('/opt/lite-avatar/funasr_local/utils/asr_utils.py'); s=p.read_text(); old='from modelscope.utils.logger import get_logger'; new='import logging\\nget_logger = lambda: logging.getLogger(__name__)'; assert old in s; p.write_text(s.replace(old, new, 1))"
+
 COPY --from=dependencies /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 WORKDIR /app
