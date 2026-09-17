@@ -145,10 +145,9 @@ test('SRT validation checks every word, timing bounds and uppercase question wit
   assert.throws(()=>subtitles(srt.replace('00:00:01,500 -->','00:00:00,900 -->'),'What is this? A test. It works.','What is this?',3),/overlap/);
 });
 
-test('HeyGen refuses unauthorized, unaccepted and legacy spending; repeated setup is free and idempotent',async()=>{
+test('HeyGen refuses unaccepted and legacy spending; repeated setup is free and idempotent for members',async()=>{
   const h=harness();try{
     const j=await h.service.create(h.parent.id,hgSettings,'Arvie');assert.equal((await h.service.create(h.parent.id,hgSettings,'Macy')).id,j.id);
-    await assert.rejects(h.service.start(j.id,'render',{acceptCost:true,acceptedEstimate:2},'Keziah'),/Arvie or Macy/);
     await assert.rejects(h.service.start(j.id,'render',{acceptCost:false,acceptedEstimate:2},'Arvie'),/estimate/);
     await assert.rejects(h.service.start(j.id,'render',{acceptCost:true,acceptedEstimate:1.5},'Arvie'),/estimate/);
     const legacy=h.service.get(j.id);delete legacy.provider;h.service.save(legacy);
@@ -178,8 +177,7 @@ test('cropped source gets one free corrected setup; resuming cannot repeat the f
     const old={...prepareHeyGen(h.parent,hgSettings,avatar,voice),id:'cropped-source',identity:'old-portrait-cover',status:'paused',error:'SOURCE_FRAMING_INCOMPATIBLE: source edges missing.',files:{original:true,voice:true},requests:{video:{id:'already-paid',state:'completed'}}};
     delete old.sourceFraming;h.service.save(old);const before=h.service.get(old.id);
     await assert.rejects(h.service.start(old.id,'resume',{},'Macy'),/cannot restore missing edges/);
-    await assert.rejects(h.service.revisions.replaceFraming(old.id,'Keziah'),/Arvie or Macy/);
-    const fixed=await h.service.revisions.replaceFraming(old.id,'Arvie');
+    const fixed=await h.service.revisions.replaceFraming(old.id,'Keziah');
     assert.equal((await h.service.revisions.replaceFraming(old.id,'Macy')).id,fixed.id);
     assert.equal(fixed.status,'prepared');assert.equal(fixed.sourceFraming.aspectRatio,'auto');assert.equal(fixed.sourceFraming.fit,'contain');assert.equal(fixed.format.aspectRatio,'9:16');
     assert.equal(fixed.script,old.script);assert.deepEqual(fixed.avatar,old.avatar);assert.deepEqual(fixed.voice,old.voice);assert.deepEqual(fixed.requests,{});assert.equal(fixed.authorization,undefined);
@@ -213,7 +211,6 @@ test('one mocked HeyGen generation automatically assembles real media then waits
     const j=await h.service.create(h.parent.id,hgSettings,'Arvie');await h.service.start(j.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie');
     for(let i=0;i<1200&&h.service.active.has(j.id);i++)await new Promise(r=>setTimeout(r,25));
     const result=h.service.get(j.id);assert.equal(result.status,'visual_review',result.error);assert.equal(submits,1);assert.equal(result.technicalQA.native1080,true);assert.equal(result.technicalQA.aspectRatio,'9:16');assert.equal(result.technicalQA.logoIncluded,true);assert.equal(result.files.video,true);assert.equal(result.files.captions,true);assert.equal(result.source.folderUrl,h.parent.row.folderUrl);assert.ok(existsSync(join(h.service.directory(result),'thumbnail.png')));
-    await assert.rejects(h.service.review(j.id,{decision:'approve',note:'Test approval without checks'},'Keziah'),/Macy or Arvie/);
     await assert.rejects(h.service.review(j.id,{decision:'approve',note:'Test approval without checks'},'Macy'),/Check lips/);
     const revised=await h.service.review(j.id,{decision:'reject',note:'Automated fixture: increase caption size for readability.',changeType:'layout',visualSettings:{captionSize:64,captionBottom:115,logoScale:1}},'Macy');assert.equal(revised.status,'compositing');
     for(let i=0;i<1200&&h.service.active.has(j.id);i++)await new Promise(r=>setTimeout(r,25));

@@ -17,7 +17,7 @@ const now=()=>new Date().toISOString();
 export class VideoRevisions{
   constructor(service){this.service=service;this.reviewing=new Set();this.applying=new Set();}
   async replaceFraming(id,actor){
-    const s=this.service;if(!['Arvie','Macy'].includes(actor))fail('Arvie or Macy prepares video replacements.',403);
+    const s=this.service;
     if(this.applying.has(id)||s.active.has(id))fail('This video is already processing.',409);this.applying.add(id);
     try{
       const old=s.get(id);if(old.provider!=='heygen'||!old.error?.includes('SOURCE_FRAMING_INCOMPATIBLE'))fail('This video has no failed source-framing check.',409);
@@ -37,7 +37,7 @@ export class VideoRevisions{
     }finally{this.applying.delete(id);}
   }
   async upgrade(id,actor){
-    const s=this.service;if(!['Arvie','Macy'].includes(actor))fail('Arvie or Macy rebuilds video layouts.',403);
+    const s=this.service;
     if(this.applying.has(id)||s.active.has(id))fail('This video is already processing.',409);this.applying.add(id);
     try{
       const old=s.get(id),parent=s.store.get(old.parentId),approvalHash=approved(parent,old.index);
@@ -65,7 +65,7 @@ export class VideoRevisions{
     }finally{this.applying.delete(id);}
   }
   async review(id,body,actor){
-    const s=this.service;if(!['Macy','Arvie'].includes(actor))fail('Macy or Arvie reviews the final video.',403);
+    const s=this.service;
     if(this.reviewing.has(id)||s.active.has(id))fail('This video is already processing.',409);this.reviewing.add(id);
     try{
       const j=s.get(id);await s.validate(j);if(body.expectedOutputRevision!==undefined&&body.expectedOutputRevision!==(j.outputRevision||1))fail('This output changed. Review its current version.',409);
@@ -84,7 +84,7 @@ export class VideoRevisions{
   }
   async apply(id,body,actor){if(this.applying.has(id))fail('A video revision is already being applied.',409);this.applying.add(id);try{return await this.applyChange(id,body,actor);}finally{this.applying.delete(id);}}
   async applyChange(id,body,actor){
-    const s=this.service;if(!['Macy','Arvie'].includes(actor))fail('Macy or Arvie applies video changes.',403);
+    const s=this.service;
     const j=s.get(id);if(j.status!=='revision_pending'||s.active.has(id))fail('This video has no pending revision.',409);await s.validate(j);
     const type=body.changeType||'manual';
     if(type==='script'){
@@ -115,6 +115,6 @@ export class VideoRevisions{
       try{await s.start(replacement.id,'render',{acceptCost:true,acceptedEstimate:replacement.renderEstimate},actor);j.revisionRequest.status='replacement_started';s.save(j);}catch(e){replacement.error=e.message;s.save(replacement);}
       return s.get(replacement.id);
     }
-    j.error='Feedback is waiting for a manual correction. OpenAI is not required for explicit layout controls; free-text edits can be applied by Codex/Arvie during this test.';s.save(j);return j;
+    j.error='Feedback is waiting for a manual correction. Explicit layout controls do not require an AI API; free-text edits remain saved for an administrator to apply.';s.save(j);return j;
   }
 }

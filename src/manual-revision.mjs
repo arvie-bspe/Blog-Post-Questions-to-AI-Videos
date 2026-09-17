@@ -3,7 +3,7 @@ import {questionHash,updateQuestionStatus} from './question-approval.mjs';
 
 export function manualRevision(job,body,actor){
   const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
-  if(actor!=='Arvie')fail('Arvie manages manual draft updates.',403);
+  if(!actor)fail('An authenticated administrator manages manual draft updates.',403);
   if(job.status==='analyzing'||body.expectedRevision!==job.revision)fail('The draft changed. Reload before saving a revision.',409);
 
   if(typeof body.note!=='string'||body.note.trim().length<10||body.note.length>4000)fail('Include revision notes of 10 to 4000 characters.');
@@ -15,7 +15,7 @@ export function manualRevision(job,body,actor){
   next.history=[...(next.history||[]),...(job.plan?[{at:job.updated,plan:job.plan,reviews:job.reviews,origin:job.origin,validation:job.validation,audit:job.audit,revision:job.revision}]:[])];
   next.plan=structuredClone(plan);next.validation=validation;
   next.origin='Manual revision with source evidence; no API generation';
-  next.audit={passed:null,issues:['Manual draft revision. Keziah must review the revised wording against the cited article.']};
+  next.audit={passed:null,issues:['Manual draft revision. A script reviewer must review the revised wording against the cited article.']};
   next.status='content_review';next.error=null;next.scriptTargetSeconds=30;
   next.draftVersion=(job.draftVersion||1)+1;
   next.manualRevisions=[...(next.manualRevisions||[]),{actor,at:new Date().toISOString(),note:body.note.trim(),previousRevision:job.revision,draftVersion:next.draftVersion}];

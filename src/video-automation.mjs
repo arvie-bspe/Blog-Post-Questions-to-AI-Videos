@@ -25,7 +25,7 @@ export class ApprovalVideoAutomation {
   profile(parent){
     const row=this.db.prepare('SELECT payload FROM video_automation_profiles WHERE parent=?').get(parent),saved=row?JSON.parse(row.payload):null;
     if(saved&&(saved.enabled===false||[presenterPool.version,'2026-09-16'].includes(saved.policyVersion)))return saved;
-    return {id:'automatic-'+presenterPool.version,policyVersion:presenterPool.version,mode:'automatic',enabled:true,parent,maxEstimatedCost:2,authorizedBy:'Arvie',authorizedAt:'2026-09-16',authorization:'User requested automatic selection and generation after Keziah approval.'};
+    return {id:'automatic-'+presenterPool.version,policyVersion:presenterPool.version,mode:'automatic',enabled:true,parent,maxEstimatedCost:2,authorizedBy:'system',authorizedAt:'2026-09-16',authorization:'Automatic selection and generation begins after an individual script approval.'};
   }
   view(parent){
     if(!this.service.store.get(parent))fail('Article not found.',404);
@@ -35,7 +35,6 @@ export class ApprovalVideoAutomation {
   }
 
   configure(parent,body,actor){
-    if(actor!=='Arvie')fail('Arvie configures automatic video generation and spending.',403);
     if(!this.service.store.get(parent))fail('Article not found.',404);
     if(body.enabled===false){const previous=this.profile(parent)||{};this.db.prepare('INSERT OR REPLACE INTO video_automation_profiles VALUES(?,?)').run(parent,JSON.stringify({...previous,policyVersion:presenterPool.version,enabled:false,updated:now()}));return this.view(parent);}
     const avatar=this.service.avatars.get(body.avatarId),voice=this.service.voices.get(body.voiceId),limit=Number(body.maxEstimatedCost);
@@ -73,7 +72,7 @@ export class ApprovalVideoAutomation {
       return current;
     }
     const reusable=compatible.find(j=>j.requests.video.state==='completed'&&j.files?.original&&j.files?.voice&&j.sourceFraming?.version==='preserve-source-1'&&j.cues?.length);
-    if(reusable)return await s.revisions.upgrade(reusable.id,'Arvie');
+    if(reusable)return await s.revisions.upgrade(reusable.id,'system');
     // Existing paid footage must never silently turn into a new paid retry.
     throw new Error(compatible.length?'The existing paid footage needs a reviewed correction. No replacement was purchased.':presenterIssue(paid[0].avatar,paid[0].voice));
   }

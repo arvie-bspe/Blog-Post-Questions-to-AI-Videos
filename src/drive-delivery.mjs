@@ -9,7 +9,7 @@ export class DriveDelivery{
   async call(url,options={}){const response=await this.fetcher(url,{...options,headers:{...options.headers,Authorization:`Bearer ${await this.token()}`},redirect:'error',signal:AbortSignal.timeout(180000)});return response;}
   async json(url,options){const r=await this.call(url,options);if(!r.ok)throw new Error(`Google Drive returned HTTP ${r.status}. Check authorization and folder access.`);return r.json();}
   async deliver(job,dir,save,assertCurrent){
-    if(job.status!=='delivery_pending'||job.reviews.at(-1)?.decision!=='approve')throw new Error('Macy must approve this exact video revision before Drive delivery.');
+    if(job.status!=='delivery_pending'||job.reviews.at(-1)?.decision!=='approve')throw new Error('A reviewer must approve this exact video revision before Drive delivery.');
     const folder=googleId(job.source.folderUrl,'folder');if(!folder)throw new Error('The selected row has no valid Visual folder.');
     const metadata=await this.json(`${base}/${folder}?supportsAllDrives=true&fields=id,mimeType,trashed,capabilities(canAddChildren)`);
     if(metadata.id!==folder||metadata.trashed||metadata.mimeType!=='application/vnd.google-apps.folder'||!metadata.capabilities?.canAddChildren)throw new Error('The Visual folder is missing or is not writable by the connected Google account.');

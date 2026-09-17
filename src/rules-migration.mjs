@@ -17,8 +17,8 @@ export function reconcileRules(store){
     if(job.plan){job.validation=validatePlan(job.plan,job.doc,job.client);if(!visualOnly)job.status=job.validation.errors.length?'needs_review':'content_review';}
     else job.status='inspected';
     if(!visualOnly&&job.origin?.startsWith('OpenAI'))job.audit={passed:false,issues:['The content rules changed. Run a fresh source audit before approving this draft.']};
-    if(visualOnly){job.history.at(-1).reason='Appearance-only update. Existing script and content decisions preserved.';job.layoutNotice='Macy’s new layout rules apply to regenerated videos. Existing videos need the updated layout and a fresh Macy review.';}
-    else job.error='Global rules were updated. The saved script is unchanged; Keziah must review it under the current rules before video generation.';
+    if(visualOnly){job.history.at(-1).reason='Appearance-only update. Existing script and content decisions preserved.';job.layoutNotice='The current layout rules apply to regenerated videos. Existing videos need the updated layout and a fresh video review.';}
+    else job.error='Global rules were updated. The saved script is unchanged; a script reviewer must review it under the current rules before video generation.';
     if(perQuestion){job.layoutNotice='Approval is now per question. Review each script card separately. Existing paid videos are kept and can be reused after the matching question is approved.';job.error=null;}
     store.db.exec('BEGIN IMMEDIATE');
     try{

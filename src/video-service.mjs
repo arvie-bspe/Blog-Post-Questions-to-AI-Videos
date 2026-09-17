@@ -67,9 +67,9 @@ export class VideoService {
   async validate(j){
     if(!j.provider)error('This is a saved fal.ai setup. Prepare a new video from the current approved script; the old record is kept for history.',409);
     if(j.provider!=='heygen'&&!isWorkerVideoProvider(j.provider))error('This is a saved legacy setup. Prepare a new video from the current approved script; the old record is kept for history.',409);
-    if(j.layoutVersion!==layoutVersion)error('This video uses the previous layout. Rebuild it with Macy’s updated layout before review or delivery.',409);
+    if(j.layoutVersion!==layoutVersion)error('This video uses the previous layout. Rebuild it with the current layout before review or delivery.',409);
     matchingPresenter(j.avatar,j.voice);
-    if(j.files?.video&&j.detectorVersion!==detectorVersion)error('Rebuild this saved footage with the current framing checks before Macy review or delivery. No new HeyGen render is needed.',409);
+    if(j.files?.video&&j.detectorVersion!==detectorVersion)error('Rebuild this saved footage with the current framing checks before video review or delivery. No new HeyGen render is needed.',409);
     const parent=this.store.get(j.parentId);if(approved(parent,j.index)!==j.approvalHash)error('The source or script review changed. Prepare from the current approved version.',409);
     await this.checkFresh(parent,j.index);if(approved(this.store.get(j.parentId),j.index)!==j.approvalHash)error('The content review changed during this request.',409);
   }
@@ -85,7 +85,6 @@ export class VideoService {
     if(!this.db.prepare('SELECT changes() AS n').get().n)error('The daily HeyGen request limit has been reached.');
   }
   async create(parentId,body,actor){
-    if(!['Arvie','Macy'].includes(actor))error('Arvie or Macy prepares videos.',403);
     this.assertHeyGenEnabled();
     const parent=this.store.get(parentId);approved(parent,body.index);await this.checkFresh(parent,body.index);
     const data=prepare(this.store.get(parentId),body,this.avatars.get(body.avatarId),this.voices.get(body.voiceId));
@@ -93,7 +92,6 @@ export class VideoService {
     const j={...data,id:randomUUID(),created:now(),createdBy:actor,presenterAcceptedAt:now()};this.save(j);this.store.record(parentId,actor,'prepare_heygen_video');return publicJob(j);
   }
   async start(id,action,body,actor){
-    if(!['Arvie','Macy'].includes(actor))error('Arvie or Macy manages video creation.',403);
     this.assertHeyGenEnabled();
     if(this.active.has(id))error('This video is already processing.',409);this.active.add(id);
     try{
@@ -149,7 +147,7 @@ export class VideoService {
       const probe=await this.media.probe(join(dir,'presenter.mp4'));j.duration=durationOf(probe);j.measuredCostEstimate=estimate(j.avatar.type,j.duration);this.save(j);
       if(!probe.streams.some(s=>s.codec_type==='audio')||!probe.streams.some(s=>s.codec_type==='video')||j.duration>180)
         throw Object.assign(new Error('The HeyGen result has missing media or exceeds this service’s 180-second processing allowance. Review the original; no words were cut or replacement purchased.'),{permanent:true});
-      j.runtimeReview=j.duration>30.25?'Above the preferred 30 seconds: Macy must confirm necessary context, natural pace, and absence of filler.':null;this.save(j);
+      j.runtimeReview=j.duration>30.25?'Above the preferred 30 seconds: the video reviewer must confirm necessary context, natural pace, and absence of filler.':null;this.save(j);
       if(!result.subtitle_url)throw new Error('HeyGen has not returned caption timing yet. Resume to check the same video.');
       const captionFile=await this.heygen.bytes(result.subtitle_url,1024*1024);
       writeFileSync(join(dir,'provider-captions.srt'),captionFile.body);
@@ -186,15 +184,14 @@ export class VideoService {
     res.writeHead(partial?206:200,{'Content-Type':type,'Content-Length':end-start+1,'Accept-Ranges':'bytes','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...(partial?{'Content-Range':`bytes ${start}-${end}/${size}`}:{})});
     if(req.method==='HEAD')return res.end();createReadStream(path,{start,end}).on('error',()=>res.destroy()).pipe(res);
   }
-  async route({req,res,path,url,actor,json,send}){
+  async route({req,res,path,url,actor,account,json,send}){
     const automation=path.match(/^\/api\/jobs\/([a-f0-9-]+)\/video-automation$/);
     if(automation){if(req.method==='GET')send(res,200,this.automation.view(automation[1]));else if(req.method==='POST'){
       const body=await json(req);
       if(body.action==='resume'){
-        if(!['Arvie','Macy'].includes(actor))error('Arvie or Macy can continue video processing.',403);
         const state=this.automation.view(automation[1]),run=state.runs.find(r=>r.id===body.runId);if(!run||run.status!=='blocked')error('Choose the blocked question approval to continue.');
         queueMicrotask(()=>this.automation.run(run));send(res,202,state);
-      }else send(res,200,this.automation.configure(automation[1],body,actor));
+      }else {if(account?.role!=='admin')error('An admin account is required to change automatic video settings.',403);send(res,200,this.automation.configure(automation[1],body,actor));}
     }else error('Unsupported request.',405);return true;}
     if(path==='/api/video-config'&&req.method==='GET'){send(res,200,await this.catalog());return true;}
     if(path==='/api/video-settings')error('Configure HEYGEN_API_KEY privately in Railway Variables, or the local .env file.',403);
@@ -223,7 +220,7 @@ export class VideoService {
     if(action==='layout-upgrade'){send(res,202,publicJob(await this.revisions.upgrade(id,actor)));return true;}
     if(action==='framing-replacement'){send(res,200,publicJob(await this.revisions.replaceFraming(id,actor)));return true;}
     if(action==='revise'){send(res,200,publicJob(await this.revisions.apply(id,body,actor)));return true;}
-    if(action==='deliver'){if(!['Arvie','Macy'].includes(actor))error('Macy or Arvie retries delivery.',403);await this.validate(this.get(id));this.deliver(id);send(res,202,publicJob(this.get(id)));return true;}
+    if(action==='deliver'){await this.validate(this.get(id));this.deliver(id);send(res,202,publicJob(this.get(id)));return true;}
     send(res,action==='review'?200:202,action==='review'?await this.review(id,body,actor):await this.start(id,action,body,actor));return true;
   }
 }

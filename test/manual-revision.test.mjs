@@ -20,8 +20,8 @@ test('manual update preserves old wording and feedback and requires a fresh revi
   assert.deepEqual(result.history[0].plan,before.plan);assert.deepEqual(result.history[0].reviews,before.reviews);assert.equal(result.draftVersion,2);
   assert.notDeepEqual(result.plan,before.plan);assert.equal(result.scriptTargetSeconds,30);
 });
-test('manual update blocks unauthorized, stale, unsupported, and overlong replacements',()=>{
-  const j=original();assert.throws(()=>manualRevision(j,edit(j),'Keziah'),/Arvie/);
+test('manual update blocks unauthenticated, stale, unsupported, and overlong replacements',()=>{
+  const j=original();assert.throws(()=>manualRevision(j,edit(j),''),/administrator/);
   assert.throws(()=>manualRevision(j,{...edit(j),expectedRevision:4},'Arvie'),/changed/);
   const unsupported=edit(j);unsupported.plan.videos[0].sentences[0].evidence[0].quote='Invented source quote which is absent from this article.';
   assert.throws(()=>manualRevision(j,unsupported,'Arvie'),/evidence/);

@@ -36,12 +36,12 @@ test('connected script rewrite receives feedback and prior draft, saves history,
     await workflow.start(job.id,'Shorten the second answer.');await assert.rejects(workflow.start(job.id),/already/);release();await wait();const after=store.get(job.id);assert.equal(calls,1);assert.equal(after.status,'content_review');assert.equal(after.reviews.length,0);assert.deepEqual(after.history[0].plan,before);assert.equal(after.revisionRequest.status,'applied');
   }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
-test('Google OAuth checks role, state, PKCE and scopes, and keeps the refresh token out of status',async()=>{
+test('Google OAuth checks authentication, state, PKCE and scopes, and keeps the refresh token out of status',async()=>{
   const dir=mkdtempSync(join(tmpdir(),'google-connect-')),old=process.env.GOOGLE_REFRESH_TOKEN;
   try{
     const env={GOOGLE_CLIENT_ID:'test-client',GOOGLE_CLIENT_SECRET:'test-secret'},g=new GoogleConnection({env,dataDir:dir,origin:'https://studio.test',fetcher:async(url,options)=>{assert.equal(url,'https://oauth2.googleapis.com/token');assert.ok(options.body.get('code_verifier'));return Response.json({refresh_token:'test-refresh',scope:googleScopes.join(' ')});}});
-    assert.throws(()=>g.start('Macy'),/Arvie/);await assert.rejects(g.callback(new URLSearchParams({state:'bogus',code:'test'})),/expired/);
-    const url=new URL(g.start('Arvie').url);assert.equal(url.searchParams.get('code_challenge_method'),'S256');await g.callback(new URLSearchParams({state:url.searchParams.get('state'),code:'test-code'}));assert.equal(g.status().connected,true);assert.doesNotMatch(JSON.stringify(g.status()),/test-refresh|test-secret/);assert.ok(existsSync(join(dir,'google-connection.private.json')));
+    assert.throws(()=>g.start(''),/Sign in/);await assert.rejects(g.callback(new URLSearchParams({state:'bogus',code:'test'})),/expired/);
+    const url=new URL(g.start('Workspace admin').url);assert.equal(url.searchParams.get('code_challenge_method'),'S256');await g.callback(new URLSearchParams({state:url.searchParams.get('state'),code:'test-code'}));assert.equal(g.status().connected,true);assert.doesNotMatch(JSON.stringify(g.status()),/test-refresh|test-secret/);assert.ok(existsSync(join(dir,'google-connection.private.json')));
     await assert.rejects(g.callback(new URLSearchParams({state:url.searchParams.get('state'),code:'test-code'})),/expired/);
   }finally{if(old===undefined)delete process.env.GOOGLE_REFRESH_TOKEN;else process.env.GOOGLE_REFRESH_TOKEN=old;rmSync(dir,{recursive:true,force:true});}
 });
@@ -58,7 +58,7 @@ test('Drive delivery requires approval and reconciles an uncertain upload using 
       const id=new URL(url).pathname.split('/').at(-1);return remote.has(id)?Response.json(remote.get(id)):new Response(null,{status:404});
     };
     const delivery=new DriveDelivery({fetcher,token:async()=> 'mock-google-token'}),j={id:'video-test',thumbnailTitle:'Test Video Only',status:'visual_review',outputRevision:1,source:{folderUrl:'https://drive.google.com/drive/folders/folder123'},reviews:[]};
-    await assert.rejects(delivery.deliver(j,dir,()=>{},async()=>{}),/Macy/);assert.equal(uploads,0);
+    await assert.rejects(delivery.deliver(j,dir,()=>{},async()=>{}),/reviewer/);assert.equal(uploads,0);
     j.status='delivery_pending';j.reviews=[{actor:'Macy',decision:'approve'}];await assert.rejects(delivery.deliver(j,dir,()=>{},async()=>{}),/response loss/);const first=j.delivery.files['final.mp4'].id;
     await delivery.deliver(j,dir,()=>{},async()=>{});assert.equal(j.status,'delivered');assert.equal(j.delivery.files['final.mp4'].id,first);assert.equal(uploads,3);assert.equal(remote.size,3);assert.ok(Object.values(j.delivery.files).every(f=>f.state==='complete'));
   }finally{rmSync(dir,{recursive:true,force:true});}

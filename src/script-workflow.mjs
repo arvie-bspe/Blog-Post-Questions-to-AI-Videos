@@ -25,7 +25,7 @@ export class ScriptWorkflow{
     const job=this.store.get(id);
     feedback=[...new Set([...(job.reviews||[]).filter(r=>r.decision==='reject').map(r=>r.note),feedback].filter(Boolean))].join('\n\n');
     if(this.active.has(id)||job.status==='analyzing')throw Object.assign(new Error('Script analysis is already running.'),{status:409});
-    if(!this.env.OPENAI_API_KEY){job.status=job.plan?'revision_pending':'awaiting_script';job.revisionRequest={feedback,status:'awaiting_manual_update',at:new Date().toISOString()};job.error='OpenAI is not connected. Codex/Arvie can prepare or revise this script manually for the test; no automatic rewrite has run.';this.store.save(job);return job;}
+    if(!this.env.OPENAI_API_KEY){job.status=job.plan?'revision_pending':'awaiting_script';job.revisionRequest={feedback,status:'awaiting_manual_update',at:new Date().toISOString()};job.error='OpenAI is not connected. An administrator can prepare or revise this script manually for the test; no automatic rewrite has run.';this.store.save(job);return job;}
     await this.checkFresh(job);if(this.store.get(id).revision!==job.revision)throw Object.assign(new Error('The article changed. Reload before analysis.'),{status:409});
     const limit=Number(this.env.DAILY_ANALYSIS_LIMIT||10);if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid daily analysis limit.');this.store.consume(limit);
     const previousPlan=job.plan;

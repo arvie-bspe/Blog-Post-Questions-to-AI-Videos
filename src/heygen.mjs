@@ -6,7 +6,7 @@ export function mediaURL(value){
   let u;try{u=new URL(value);}catch{throw new Error('HeyGen returned an invalid media URL.');}
   if(u.protocol!=='https:'||u.port||u.username||u.password||
     !['heygen.ai','heygen.com'].some(host=>u.hostname===host||u.hostname.endsWith('.'+host)))
-    throw new Error('HeyGen returned an unexpected media host. Ask Arvie to check the saved provider request.');
+    throw new Error('HeyGen returned an unexpected media host. Ask an administrator to check the saved provider request.');
   return u.href;
 }
 export function providerId(value){

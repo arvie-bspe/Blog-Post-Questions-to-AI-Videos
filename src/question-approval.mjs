@@ -9,7 +9,8 @@ export function questionHash(job,index){const p=questionPlan(job,index);return h
 export function questionState(job,index){
  const fingerprint=questionHash(job,index),reviews=(job.questionReviews||[]).filter(r=>r.index===index&&r.draftHash===fingerprint),last=reviews.at(-1),request=job.questionRequests?.[index];
  const pending=request?.draftHash===fingerprint&&['working','awaiting_manual_update','failed'].includes(request.status);
- return {index,draftHash:fingerprint,question:job.plan.videos[index].question,status:pending?(request.status==='working'?'analyzing':'revision_pending'):last?.decision==='approve'?'approved':last?.decision==='reject'?'revision_pending':'pending',reviews,request:request?.draftHash===fingerprint?request:null,validation:validateForJob(questionPlan(job,index),job.doc,job.client,1)};
+ const decision=last?.decision,status=pending?(request.status==='working'?'analyzing':'revision_pending'):decision==='approve'?'approved':decision==='reject'?'revision_pending':decision==='skip'?'skipped':'pending';
+ return {index,draftHash:fingerprint,question:job.plan.videos[index].question,status,reviews,request:request?.draftHash===fingerprint?request:null,validation:validateForJob(questionPlan(job,index),job.doc,job.client,1)};
 }
 export function approvedQuestion(job,index){
  const state=questionState(job,index);
@@ -25,7 +26,8 @@ export function approvedQuestion(job,index){
 export function updateQuestionStatus(job){
  if(!job.plan?.videos?.length)return job;
  const states=job.plan.videos.map((_,i)=>questionState(job,i));
- job.status=states.every(s=>s.status==='approved')?'pilot_reviewed':states.some(s=>s.status==='approved')?'partially_reviewed':states.some(s=>s.status==='revision_pending')?'revision_pending':'content_review';return job;
+ const approved=states.filter(s=>s.status==='approved').length,terminal=states.every(s=>['approved','skipped'].includes(s.status));
+ job.status=terminal&&approved?'pilot_reviewed':terminal?'no_videos_selected':approved?'partially_reviewed':states.some(s=>s.status==='revision_pending')?'revision_pending':'content_review';return job;
 }
 export function recordQuestionReview(job,index,review){
  const state=questionState(job,index);

@@ -23,7 +23,7 @@ export function prepare(job,body,avatar,voice){
   const text=scriptText(video),wordCount=text.trim().split(/\s+/).length;
   const articleIdentity=requireArticleIdentity(job.doc,job.plan.articleIdentity);
   const endCard={...endCardData({articleIdentity,script:text,source:{targetUrl:job.row.pageUrl}}),seconds:3};
-  if(wordCount>75&&(!video.runtimeReason||video.runtimeReason.trim().length<20))throw new Error('Explain why the longer script is necessary for accuracy, then have Keziah review it.');
+  if(wordCount>75&&(!video.runtimeReason||video.runtimeReason.trim().length<20))throw new Error('Explain why the longer script is necessary for accuracy, then have a script reviewer check it.');
   if(text.length>7000)throw new Error('This script exceeds the supported video request size.');
   if([text,articleIdentity.name,articleIdentity.address,articleIdentity.phone].some(t=>typeof t!=='string'||!t.trim()||/[{}\\<>\x00-\x08]/.test(t)))throw new Error('Script or contact details are missing or contain unsupported markup.');
   const avatarSnapshot={id:avatar.id,name:avatar.name,type:avatar.type,personKey:avatar.personKey,gender:avatar.gender},voiceSnapshot={id:voice.id,name:voice.name,language:voice.language,gender:voice.gender};

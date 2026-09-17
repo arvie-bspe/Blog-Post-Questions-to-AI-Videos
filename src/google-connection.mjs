@@ -8,7 +8,7 @@ export class GoogleConnection{
   load(){if(existsSync(this.file)){const saved=JSON.parse(readFileSync(this.file,'utf8'));if(saved.clientId===this.env.GOOGLE_CLIENT_ID&&saved.refreshToken){this.env.GOOGLE_REFRESH_TOKEN=saved.refreshToken;process.env.GOOGLE_REFRESH_TOKEN=saved.refreshToken;}}}
   status(){return {clientConfigured:Boolean(this.env.GOOGLE_CLIENT_ID&&this.env.GOOGLE_CLIENT_SECRET),connected:Boolean(this.env.GOOGLE_REFRESH_TOKEN||this.env.GOOGLE_SERVICE_ACCOUNT_JSON),redirectUri:this.origin+'/api/google/callback'};}
   start(actor){
-    if(actor!=='Arvie')fail('Arvie connects the Google account.',403);if(!this.status().clientConfigured)fail('Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET privately in Railway first.');
+    if(!actor)fail('Sign in before connecting Google.',401);if(!this.status().clientConfigured)fail('Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET privately in Railway first.');
     const state=randomBytes(32).toString('hex'),verifier=randomBytes(48).toString('base64url');
     for(const [k,v]of this.states)if(v.expires<Date.now())this.states.delete(k);if(this.states.size>=10)fail('Too many pending Google connections. Try again shortly.');
     this.states.set(state,{verifier,expires:Date.now()+600000});

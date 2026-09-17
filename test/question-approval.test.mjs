@@ -37,6 +37,10 @@ test('bulk legacy approvals are archived but never converted into two question a
   assert.ok(next.history.some(h=>h.reviews.some(r=>r.note==='Old bulk review')));assert.equal(questionState(next,0).status,'pending');assert.equal(questionState(next,1).status,'pending');assert.equal(next.plan.videos.length,2);
  }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
+test('one approved question and one skipped question complete selection without a second video',()=>{
+ const j=source();recordQuestionReview(j,0,{actor:'Reviewer',decision:'approve',note:'This question is approved for video.'});recordQuestionReview(j,1,{actor:'Reviewer',decision:'skip',note:'This question is not a useful video candidate.'});
+ assert.equal(j.status,'pilot_reviewed');assert.equal(questionState(j,0).status,'approved');assert.equal(questionState(j,1).status,'skipped');assert.doesNotThrow(()=>approvedQuestion(j,0));assert.throws(()=>approvedQuestion(j,1),/review/);
+});
 test('HTTP approval requires one index, scopes generation, and lets one rejected script coexist with an approved sibling',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'one-approval-http-')),app=createApp({HOST:'127.0.0.1',PORT:'4180',APP_ORIGIN:'http://127.0.0.1:4180',DATA_DIR:dir});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
  const j=app.store.create(source()),calls=[];app.video.automation.enqueue=(id,actor,index)=>{calls.push(index);};

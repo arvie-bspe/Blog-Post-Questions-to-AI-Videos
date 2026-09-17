@@ -23,8 +23,8 @@ export function importSavedReviews(store,path=new URL('../bootstrap/saved-review
       const existing=store.db.prepare('SELECT id FROM jobs WHERE identity=?').get(identity);
       if(existing){store.db.prepare('INSERT INTO saved_review_imports VALUES(?,?)').run(key,existing.id);continue;}
       const job=store.create({row,client,doc,identity,mode:'saved_snapshot',rulesHash,rulesVersion:config.version});
-      Object.assign(job,{plan,validation:validatePlan(plan,doc,client),status:'content_review',origin:'Prepared in Codex from a current Google source snapshot; no API generation',audit:{passed:null,issues:['Keziah must review the script and cited source before approval.']},setupIssues:[...row.issues],sourceCapturedAt:batch.capturedAt,preparedBy:'Codex',seedKey:key,history:[]});
-      store.save(job);store.record(job.id,'Arvie','import_requested_saved_draft');
+      Object.assign(job,{plan,validation:validatePlan(plan,doc,client),status:'content_review',origin:'Prepared in Codex from a current Google source snapshot; no API generation',audit:{passed:null,issues:['A script reviewer must review the script and cited source before approval.']},setupIssues:[...row.issues],sourceCapturedAt:batch.capturedAt,preparedBy:'Codex',seedKey:key,history:[]});
+      store.save(job);store.record(job.id,'system','import_requested_saved_draft');
       store.db.prepare('INSERT INTO saved_review_imports VALUES(?,?)').run(key,job.id);added.push(job.id);
     }
     store.db.exec('COMMIT');return added;
