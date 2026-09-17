@@ -31,7 +31,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl espeak-ng ffmpeg libgl1 libglib2.0-0 libgomp1 libsndfile1 nodejs unzip \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=dependencies /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 RUN set -eux; \
     mkdir -p /opt/models /opt/lite-avatar-profiles /tmp/liteavatar; \
@@ -57,11 +56,13 @@ RUN set -eux; \
     mv /tmp/liteavatar/female/P1sYK8Nw7lTesGSjNMhz8Ntw /opt/lite-avatar-profiles/professional-female-01; \
     rm -rf /tmp/liteavatar
 
+COPY --from=dependencies /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+
 WORKDIR /app
 COPY worker/studio-worker.mjs worker/studio-worker.mjs
 COPY worker/liteavatar-media.py worker/liteavatar-media.py
 
-RUN python -c "import cv2, kokoro_onnx, librosa, onnxruntime, soundfile, torch, torchvision; print('LiteAvatar CPU dependencies ready')" \
+RUN PYTHONPATH=/opt/lite-avatar python -c "import cv2, kokoro_onnx, librosa, onnxruntime, soundfile, torch, torchvision; import extract_paraformer_feature; print('LiteAvatar CPU dependencies ready')" \
     && test -f /opt/lite-avatar/lite_avatar.py \
     && test -f /opt/lite-avatar-profiles/professional-male-01/bg_video.mp4 \
     && test -f /opt/lite-avatar-profiles/professional-female-01/bg_video.mp4
