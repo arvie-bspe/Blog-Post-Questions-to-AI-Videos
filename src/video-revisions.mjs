@@ -11,6 +11,7 @@ import {requireArticleIdentity} from './article-identity.mjs';
 import {recordQuestionReview} from './question-approval.mjs';
 import {matchingPresenter} from './presenter-compatibility.mjs';
 import {queueLocalReplacement} from './local-video.mjs';
+import {isWorkerVideoProvider} from './workflow-config.mjs';
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 export class VideoRevisions{
@@ -34,11 +35,12 @@ export class VideoRevisions{
     if(this.applying.has(id)||s.active.has(id))fail('This video is already processing.',409);this.applying.add(id);
     try{
       const old=s.get(id),parent=s.store.get(old.parentId),approvalHash=approved(parent,old.index);
-      if(!['heygen','local_worker'].includes(old.provider)||!old.files.original||!old.files.voice)fail('Existing source footage and speech are required for a layout rebuild.');
+      if(old.provider!=='heygen'&&!isWorkerVideoProvider(old.provider)||!old.files.original||!old.files.voice)fail('Existing source footage and speech are required for a layout rebuild.');
       const pair=matchingPresenter(old.avatar,old.voice);
       const expectedRules=parent.mode==='direct_google'?appearanceRulesHash:rulesHash;
       if(old.layoutVersion===layoutVersion&&old.detectorVersion===detectorVersion&&old.source.rulesHash===expectedRules)fail('This video already uses the current layout and framing checks. Use Request changes for another correction.');
-      if(old.provider==='heygen'&&old.requests?.video?.state!=='completed'||old.provider==='local_worker'&&old.requests?.local?.state!=='completed')fail('The existing generation task must be complete before rebuilding its footage.');
+      const workerRequest=old.provider==='liteavatar_worker'?old.requests?.liteavatar:old.requests?.local;
+      if(old.provider==='heygen'&&old.requests?.video?.state!=='completed'||isWorkerVideoProvider(old.provider)&&workerRequest?.state!=='completed')fail('The existing generation task must be complete before rebuilding its footage.');
       await s.checkFresh(parent,old.index);
       if(approved(s.store.get(parent.id),old.index)!==approvalHash)fail('The approved question changed during this request.',409);
       if(scriptText(parent.plan.videos[old.index])!==old.script||parent.doc.sourceHash!==old.source.sourceHash)fail('The script or article changed. Prepare a new video from the current approved content.');
@@ -65,6 +67,7 @@ export class VideoRevisions{
       if(!['approve','reject'].includes(body.decision)||typeof body.note!=='string'||body.note.trim().length<10||body.note.length>4000)fail('Choose a decision and add at least 10 characters of review notes.');
       if(body.decision==='approve'&&(!body.checkedVideo||!body.checkedCaptions||!body.checkedContacts))fail('Check lips, audio, captions, contacts, logo, thumbnail, and playback before marking ready.');
       if(body.decision==='approve'&&(!body.checkedFraming||!body.checkedNoNap||!body.checkedEndCard))fail('Confirm full-frame upper-torso framing, clean-logo/no-contact speech frames, and the separate white end card.');
+      if(body.decision==='approve'&&j.provider==='liteavatar_worker'&&j.avatar?.rightsStatus==='evaluation_only'&&s.env.LITEAVATAR_ASSET_RIGHTS_CONFIRMED!=='true')fail('This trial avatar is approved for internal evaluation only. Confirm commercial rights and set LITEAVATAR_ASSET_RIGHTS_CONFIRMED=true before Drive delivery.',409);
       if(body.decision==='reject'&&body.changeType==='layout')visualSettings(body.visualSettings);
       if(body.decision==='reject'&&body.changeType==='render'&&(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate))fail('Accept the displayed generation cost estimate before requesting this change.');
       j.reviews.push({actor,at:now(),decision:body.decision,note:body.note.trim(),checkedVideo:!!body.checkedVideo,checkedCaptions:!!body.checkedCaptions,checkedContacts:!!body.checkedContacts,checkedFraming:!!body.checkedFraming,checkedNoNap:!!body.checkedNoNap,checkedEndCard:!!body.checkedEndCard,authenticated:!s.local,outputRevision:j.outputRevision||1});
@@ -92,7 +95,7 @@ export class VideoRevisions{
     }
     if(type==='render'){
       if(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate)fail('Accept the displayed generation estimate before creating a replacement.');
-      if(j.provider==='local_worker')return await queueLocalReplacement(s,j,actor);
+      if(isWorkerVideoProvider(j.provider))return await queueLocalReplacement(s,j,actor);
       let voice=body.voiceId?s.voices.get(body.voiceId):j.voice;if(!voice)fail('Select an available English voice from the library.');
       voice=matchingPresenter(j.avatar,voice).voice;
       const replacement={...structuredClone(j),id:randomUUID(),identity:hash([j.id,'requested_replacement',j.revisionRequest.at]),voice:{id:voice.id,name:voice.name,language:voice.language,gender:voice.gender},previousVideoId:j.id,generationVersion:(j.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,authorization:null,automation:null};

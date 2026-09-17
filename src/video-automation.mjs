@@ -8,8 +8,8 @@ import {prepare} from './heygen-domain.mjs';
 import {choosePresenter,presenterPool} from './presenter-selection.mjs';
 import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
 import {detectorVersion} from './visual-checks.mjs';
-import {queueLocalVideo} from './local-video.mjs';
-import {videoProvider} from './workflow-config.mjs';
+import {queueWorkerVideo} from './local-video.mjs';
+import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 const topic=question=>question.replace(/[?{}\\<>:\r\n]/g,'').trim().split(/\s+/).slice(0,6).join(' ');
@@ -84,8 +84,9 @@ export class ApprovalVideoAutomation {
       this.assertProfile(entry.parent,entry.profile.id);
       const parent=service.store.get(entry.parent);if(approved(parent,entry.index)!==entry.approvalHash)throw new Error('This question or its review changed. A new individual approval is required.');
       await service.checkFresh(parent,entry.index);entry.status='working';entry.error=null;this.save(entry);
-      if(parent.mode==='direct_google'&&videoProvider(service.env)==='local_worker'){
-        const local=await queueLocalVideo(service,parent,entry.index,entry.triggeredBy);entry.videos=[local.id];entry.selection={avatar:local.avatar,voice:local.voice,selection:{method:'approved_local_assets'}};entry.status='submitted';entry.error=null;this.save(entry);return;
+      const provider=videoProvider(service.env);
+      if(parent.mode==='direct_google'&&isWorkerVideoProvider(provider)){
+        const local=await queueWorkerVideo(service,parent,entry.index,entry.triggeredBy,provider);entry.videos=[local.id];entry.selection={avatar:local.avatar,voice:local.voice,selection:{method:provider==='liteavatar_worker'?'liteavatar_cpu_trial_profiles':'approved_local_assets'}};entry.status='submitted';entry.error=null;this.save(entry);return;
       }
       const prior=await this.reuse(parent,entry.index,entry.approvalHash);
       if(prior){entry.videos=[prior.id];entry.reusedExisting=true;const held=['needs_attention','needs_reconciliation','failed','paused','changes_requested'].includes(prior.status);entry.status=held?'blocked':'submitted';entry.error=held?(prior.error||'The saved video needs attention. No replacement was purchased.'):null;this.save(entry);return;}

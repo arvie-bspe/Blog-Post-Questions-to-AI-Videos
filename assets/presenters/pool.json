@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-16-matching-gender",
+  "version": "2026-09-17-liteavatar-cpu-trial",
   "selectedBy": "Codex at Arvie request",
   "verifiedAt": "2026-09-16",
   "avatars": [
@@ -10,6 +10,26 @@
       "type": "local_image",
       "personKey": "Local Studio Presenter 01",
       "asset": "assets/presenters/studio-presenter-01.png"
+    },
+    {
+      "id": "liteavatar-trial-professional-male-01",
+      "name": "LiteAvatar Trial Professional Male 01",
+      "gender": "male",
+      "type": "liteavatar_profile",
+      "personKey": "LiteAvatar Trial Male 01",
+      "profileKey": "professional-male-01",
+      "source": "HumanAIGC-Engineering/LiteAvatarGallery/20250408/P12rUIdDyWToybp-B0DCefSQ.zip",
+      "rightsStatus": "evaluation_only"
+    },
+    {
+      "id": "liteavatar-trial-professional-female-01",
+      "name": "LiteAvatar Trial Professional Female 01",
+      "gender": "female",
+      "type": "liteavatar_profile",
+      "personKey": "LiteAvatar Trial Female 01",
+      "profileKey": "professional-female-01",
+      "source": "HumanAIGC-Engineering/LiteAvatarGallery/20250612/P1sYK8Nw7lTesGSjNMhz8Ntw.zip",
+      "rightsStatus": "evaluation_only"
     },
     {
       "id": "Brandon_Business_Sitting_Front_public",
@@ -42,6 +62,13 @@
       "type": "local_tts"
     },
     {
+      "id": "af_heart",
+      "name": "Heart - Local US English",
+      "language": "English",
+      "gender": "female",
+      "type": "local_tts"
+    },
+    {
       "id": "00e3d285aba44b27a83c47c02c9c2d9c",
       "name": "Orson - Firm & Measured",
       "language": "English",
@@ -63,5 +90,5 @@
       "type": "heygen_voice"
     }
   ],
-  "metadataSource": "HeyGen public API catalog, verified September 16, 2026"
+  "metadataSource": "HeyGen public API catalog and manually reviewed LiteAvatar trial profiles; verified September 17, 2026"
 }

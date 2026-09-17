@@ -1,0 +1,63 @@
+FROM python:3.10-slim-bookworm AS dependencies
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
+WORKDIR /build
+COPY worker/liteavatar-requirements.txt ./requirements.txt
+RUN python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+FROM python:3.10-slim-bookworm AS runtime
+
+ARG LITEAVATAR_COMMIT=5b7ec850945e03d56fb290b05fb68440c359fa86
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    LITEAVATAR_DIR=/opt/lite-avatar \
+    LITEAVATAR_PROFILES_DIR=/opt/lite-avatar-profiles \
+    LITEAVATAR_PYTHON=/usr/local/bin/python \
+    KOKORO_MODEL=/opt/models/kokoro-v1.0.int8.onnx \
+    KOKORO_VOICES=/opt/models/voices-v1.0.bin \
+    STUDIO_WORKER_TYPES=media_liteavatar \
+    STUDIO_WORKER_ID=railway-liteavatar-cpu \
+    MEDIA_RENDER_TIMEOUT_MS=1800000 \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2 \
+    ORT_NUM_THREADS=2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl espeak-ng ffmpeg libgl1 libglib2.0-0 libgomp1 libsndfile1 nodejs unzip \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=dependencies /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+
+RUN set -eux; \
+    mkdir -p /opt/models /opt/lite-avatar-profiles /tmp/liteavatar; \
+    curl -fL --retry 5 --retry-delay 3 "https://codeload.github.com/HumanAIGC/lite-avatar/tar.gz/${LITEAVATAR_COMMIT}" -o /tmp/liteavatar/source.tar.gz; \
+    echo "56ae63afb4c52ba11fd7c5f40bd0ddeaa570ec4733a14004d6b41d37496960b9  /tmp/liteavatar/source.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/liteavatar/source.tar.gz -C /opt; \
+    mv "/opt/lite-avatar-${LITEAVATAR_COMMIT}" /opt/lite-avatar; \
+    curl -fL --retry 5 --retry-delay 3 "https://modelscope.cn/models/HumanAIGC-Engineering/LiteAvatarGallery/resolve/master/lite_avatar_weights/model_1.onnx" -o /opt/lite-avatar/weights/model_1.onnx; \
+    echo "312f0213a23a1c17ecb66f9edf8413b8ef193c0d4d2f5f9dd6714a178492c34c  /opt/lite-avatar/weights/model_1.onnx" | sha256sum -c -; \
+    curl -fL --retry 5 --retry-delay 3 "https://modelscope.cn/models/HumanAIGC-Engineering/LiteAvatarGallery/resolve/master/lite_avatar_weights/model.pb" -o /opt/lite-avatar/weights/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/model.pb; \
+    echo "5bba782a5e9196166233b9ab12ba04cadff9ef9212b4ff6153ed9290ff679025  /opt/lite-avatar/weights/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/model.pb" | sha256sum -c -; \
+    curl -fL --retry 5 --retry-delay 3 "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/kokoro-v1.0.int8.onnx" -o /opt/models/kokoro-v1.0.int8.onnx; \
+    echo "ae315a79b623f244700e4afb9246c46a26066782e049ba174bf3ba433970ee9c  /opt/models/kokoro-v1.0.int8.onnx" | sha256sum -c -; \
+    curl -fL --retry 5 --retry-delay 3 "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin" -o /opt/models/voices-v1.0.bin; \
+    echo "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d  /opt/models/voices-v1.0.bin" | sha256sum -c -; \
+    curl -fL --retry 5 --retry-delay 3 "https://modelscope.cn/models/HumanAIGC-Engineering/LiteAvatarGallery/resolve/master/20250408/P12rUIdDyWToybp-B0DCefSQ.zip" -o /tmp/liteavatar/male.zip; \
+    echo "efb4cd8315cfd5f903c03f601b2f0df704d1df03c26f36b7eb7984696b001d60  /tmp/liteavatar/male.zip" | sha256sum -c -; \
+    unzip -q /tmp/liteavatar/male.zip -d /tmp/liteavatar/male; \
+    mv /tmp/liteavatar/male/P12rUIdDyWToybp-B0DCefSQ /opt/lite-avatar-profiles/professional-male-01; \
+    curl -fL --retry 5 --retry-delay 3 "https://modelscope.cn/models/HumanAIGC-Engineering/LiteAvatarGallery/resolve/master/20250612/P1sYK8Nw7lTesGSjNMhz8Ntw.zip" -o /tmp/liteavatar/female.zip; \
+    echo "7734f61f3f1d9d566f7197b4bfbbbd4363e19311b97c13a7cf8bedda5c5f4a0e  /tmp/liteavatar/female.zip" | sha256sum -c -; \
+    unzip -q /tmp/liteavatar/female.zip -d /tmp/liteavatar/female; \
+    mv /tmp/liteavatar/female/P1sYK8Nw7lTesGSjNMhz8Ntw /opt/lite-avatar-profiles/professional-female-01; \
+    rm -rf /tmp/liteavatar
+
+WORKDIR /app
+COPY worker/studio-worker.mjs worker/studio-worker.mjs
+COPY worker/liteavatar-media.py worker/liteavatar-media.py
+
+RUN python -c "import cv2, kokoro_onnx, librosa, onnxruntime, soundfile, torch, torchvision; print('LiteAvatar CPU dependencies ready')" \
+    && test -f /opt/lite-avatar/lite_avatar.py \
+    && test -f /opt/lite-avatar-profiles/professional-male-01/bg_video.mp4 \
+    && test -f /opt/lite-avatar-profiles/professional-female-01/bg_video.mp4
+
+CMD ["node", "worker/studio-worker.mjs"]

@@ -1,13 +1,15 @@
 import {createHash} from 'node:crypto';
 
-export const workflowVersion='2.0.0';
+export const workflowVersion='2.1.0';
 export const scriptPolicyVersion='independent-source-review-1';
 export const scriptPolicyHash=createHash('sha256').update(scriptPolicyVersion).digest('hex');
 export const aiProvider=env=>env.AI_PROVIDER||'codex_worker';
-// Keep legacy installations on their existing provider until the new local
-// worker is explicitly enabled. The rebuilt Railway deployment sets this to
-// local_worker; there is never an implicit paid-provider fallback.
+// Keep legacy installations on their existing provider until a self-hosted
+// worker is explicitly enabled. Self-hosted workers never fall back to a paid
+// provider implicitly.
 export const videoProvider=env=>env.VIDEO_PROVIDER||'heygen';
+export const workerVideoProviders=new Set(['local_worker','liteavatar_worker']);
+export const isWorkerVideoProvider=provider=>workerVideoProviders.has(provider);
 export const ttsProvider=env=>env.TTS_PROVIDER||'local_kokoro';
 export const directMode='direct_google';
 

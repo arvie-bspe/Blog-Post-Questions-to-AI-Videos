@@ -72,7 +72,7 @@ export function createApp(env=process.env){
   const directResolver=new DirectAIResolver({env,tasks});
   const scripts=new ScriptWorkflow({store,env,checkFresh,directResolver});
   const video=new VideoService({store,env,dataDir,checkFresh,local:security.local,tasks,onScriptChanges:(id,note,index)=>scripts.start(id,note,index)});
-  tasks.onComplete=async task=>task.type==='ai_codex'?scripts.applyTask(task):task.type==='media_local'?video.applyWorkerTask(task):undefined;
+  tasks.onComplete=async task=>task.type==='ai_codex'?scripts.applyTask(task):['media_local','media_liteavatar'].includes(task.type)?video.applyWorkerTask(task):undefined;
   queueMicrotask(async()=>{for(const r of store.db.prepare("SELECT id FROM worker_tasks WHERE status='completed' AND applied_at IS NULL ORDER BY created").all())try{await tasks.onComplete(tasks.get(r.id));}catch{}});
   const server=createServer(async(req,res)=>{
     try{

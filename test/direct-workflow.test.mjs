@@ -8,7 +8,7 @@ import {validateDirectPlan} from '../src/domain.mjs';
 import {DirectAIResolver,directInstructions} from '../src/direct-ai.mjs';
 import {TaskQueue} from '../src/task-queue.mjs';
 import {Store} from '../src/store.mjs';
-import {prepareLocal} from '../src/local-video.mjs';
+import {prepareLocal,prepareWorkerVideo} from '../src/local-video.mjs';
 import {recordQuestionReview} from '../src/question-approval.mjs';
 import {directMode,scriptPolicyHash} from '../src/workflow-config.mjs';
 
@@ -72,5 +72,7 @@ test('approved direct script prepares a zero-provider-charge local video with ma
     const job=store.create({identity:'local-direct',mode:directMode,scriptRulesHash:scriptPolicyHash,rulesHash:'appearance',doc,plan,row:{documentUrl:'https://docs.google.com/document/d/direct-doc-123/edit',pageUrl:'https://example.com/article',folderUrl:'https://drive.google.com/drive/folders/folder123'},client:{key:'Example',name:'Example Law Firm',homepage:'https://example.com'},setupIssues:[],questionReviews:[],reviews:[]});
     recordQuestionReview(job,0,{actor:'Keziah',decision:'approve',note:'Evidence and wording checked.',checkedEvidence:true,checkedWarnings:true,at:new Date().toISOString()});store.save(job);
     const video=prepareLocal(job,0);assert.equal(video.provider,'local_worker');assert.equal(video.renderEstimate,0);assert.equal(video.avatar.gender,video.voice.gender);assert.equal(video.script,'How does filing work?\n\nThe firm files the form electronically.');
+    const lite=prepareWorkerVideo(job,0,'liteavatar_worker');assert.equal(lite.provider,'liteavatar_worker');assert.equal(lite.models.video,'LiteAvatar CPU');assert.equal(lite.avatar.type,'liteavatar_profile');assert.equal(lite.avatar.gender,lite.voice.gender);assert.equal(lite.avatar.gender,'male');assert.equal(lite.renderEstimate,0);
+    const femaleJob=structuredClone(job);femaleJob.id='female-direct';femaleJob.plan.presenterContext.gender='female';femaleJob.questionReviews=[];recordQuestionReview(femaleJob,0,{actor:'Keziah',decision:'approve',note:'Female presenter context and evidence checked.',checkedEvidence:true,checkedWarnings:true,at:new Date().toISOString()});const female=prepareWorkerVideo(femaleJob,0,'liteavatar_worker');assert.equal(female.avatar.gender,'female');assert.equal(female.voice.gender,'female');assert.equal(female.voice.id,'af_heart');
   }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });

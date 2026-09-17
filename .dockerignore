@@ -5,6 +5,7 @@ data
 node_modules
 test-results
 fixtures
+work/
 
 vendor/
 .env.tmp

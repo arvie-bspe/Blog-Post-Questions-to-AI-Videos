@@ -1,6 +1,6 @@
 # Private local worker
 
-This worker connects outward to Railway. It runs Codex CLI with the current Windows user's saved login and runs optional local media models. It never opens an inbound port.
+This worker connects outward to Railway. On Windows it runs Codex CLI with the current user's saved login and can finish legacy SadTalker tasks. A separate Railway service runs new LiteAvatar CPU tasks. Neither worker opens an inbound port.
 
 Required environment variables:
 
@@ -20,3 +20,5 @@ Required environment variables:
 Use two isolated Python environments because current Kokoro ONNX and SadTalker's older pinned NumPy stack conflict. `LOCAL_MEDIA_PYTHON` runs this orchestrator with `media-requirements.txt`; `SADTALKER_PYTHON` runs SadTalker's `inference.py`. Kokoro's duration output supplies caption timing without a second speech-recognition model. Review and pin the exact model assets and licenses before production.
 
 Start the worker from this repository with `npm run worker`. The command enables Node's operating-system CA store for managed networks. Keep the computer awake and signed in. Stop it with Ctrl+C.
+
+For the Railway CPU service, use `Dockerfile.liteavatar`, set `STUDIO_WORKER_TYPES=media_liteavatar`, and reuse the web app's private worker token. The Docker image supplies `LITEAVATAR_PYTHON`, `LITEAVATAR_DIR`, `LITEAVATAR_PROFILES_DIR`, the Kokoro INT8 model, and its voices. The service needs no Codex login and no public domain.
