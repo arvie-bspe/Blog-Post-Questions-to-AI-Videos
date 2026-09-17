@@ -13,7 +13,7 @@ import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
 const now=()=>new Date().toISOString();
 const modes={
   local_worker:{avatarType:'local_image',taskType:'media_local',requestKey:'local',stage:'local_render',models:{speech:'Kokoro-82M ONNX',video:'SadTalker',alignment:'Kokoro duration output'},engines:{speech:'kokoro-onnx',animation:'sadtalker',alignment:'kokoro-duration'}},
-  liteavatar_worker:{avatarType:'liteavatar_profile',taskType:'media_liteavatar',requestKey:'liteavatar',stage:'liteavatar_render',models:{speech:'Kokoro-82M ONNX INT8',video:'LiteAvatar CPU',alignment:'Kokoro duration output'},engines:{speech:'kokoro-onnx-int8',animation:'liteavatar-cpu',alignment:'kokoro-duration'}}
+  liteavatar_worker:{avatarType:'liteavatar_profile',taskType:'media_liteavatar',requestKey:'liteavatar',stage:'liteavatar_render',models:{speech:'Kokoro-82M ONNX FP32',video:'LiteAvatar CPU',alignment:'Kokoro duration output'},engines:{speech:'kokoro-onnx-fp32',animation:'liteavatar-cpu',alignment:'kokoro-duration'}}
 };
 const mode=provider=>{if(!isWorkerVideoProvider(provider)||!modes[provider])throw new Error(`Unsupported self-hosted video provider: ${provider}`);return modes[provider];};
 export const localAvatar=presenterPool.avatars.find(a=>a.id==='local-studio-presenter-01');

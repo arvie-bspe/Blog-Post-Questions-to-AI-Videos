@@ -64,7 +64,7 @@ Add a second service from this repository and set its Dockerfile path to `Docker
 - the same private `STUDIO_WORKER_TOKEN` as the web app
 - `STUDIO_WORKER_TYPES=media_liteavatar`
 
-The image pins LiteAvatar source and every downloaded model/profile asset by SHA-256. It bundles Kokoro INT8, one male profile, and one female profile. The service has no public domain and polls the existing durable task queue over outbound HTTPS. The profiles are marked `evaluation_only`; Macy can test their quality, but Drive delivery remains blocked until commercial-use rights are documented and `LITEAVATAR_ASSET_RIGHTS_CONFIRMED=true` is set on the web app.
+The image pins LiteAvatar source and every downloaded model/profile asset by SHA-256. It bundles the CPU-compatible Kokoro FP32 model, one male profile, and one female profile. The service has no public domain and polls the existing durable task queue over outbound HTTPS. The profiles are marked `evaluation_only`; Macy can test their quality, but Drive delivery remains blocked until commercial-use rights are documented and `LITEAVATAR_ASSET_RIGHTS_CONFIRMED=true` is set on the web app.
 
 For a one-time end-to-end container check, set `LITEAVATAR_STARTUP_SMOKE=1`, deploy, wait for `LiteAvatar CPU startup smoke render passed.` in the service logs, then save the variable as `0` without redeploying the running worker.
 

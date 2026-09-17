@@ -21,4 +21,4 @@ Use two isolated Python environments because current Kokoro ONNX and SadTalker's
 
 Start the worker from this repository with `npm run worker`. The command enables Node's operating-system CA store for managed networks. Keep the computer awake and signed in. Stop it with Ctrl+C.
 
-For the Railway CPU service, use `Dockerfile.liteavatar`, set `STUDIO_WORKER_TYPES=media_liteavatar`, and reuse the web app's private worker token. The Docker image supplies `LITEAVATAR_PYTHON`, `LITEAVATAR_DIR`, `LITEAVATAR_PROFILES_DIR`, the Kokoro INT8 model, and its voices. The service needs no Codex login and no public domain.
+For the Railway CPU service, use `Dockerfile.liteavatar`, set `STUDIO_WORKER_TYPES=media_liteavatar`, and reuse the web app's private worker token. The Docker image supplies `LITEAVATAR_PYTHON`, `LITEAVATAR_DIR`, `LITEAVATAR_PROFILES_DIR`, the CPU-compatible Kokoro FP32 model, and its voices. The service needs no Codex login and no public domain.
