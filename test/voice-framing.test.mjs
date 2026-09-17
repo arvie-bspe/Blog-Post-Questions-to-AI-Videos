@@ -38,7 +38,7 @@ test('reused captions restore script casing without altering cue times or words'
 });
 test('appearance migration preserves existing per-question decisions without granting the sibling approval',()=>{
  const dir=mkdtempSync(join(tmpdir(),'voice-migration-')),store=new Store(join(dir,'db'));
- try{const p=parent(store,config.rules.visualOnlyFromHashes[0]);approveFixture(p,0);store.save(p);const before=questionState(p,0),sibling=questionState(p,1);reconcileRules(store);const next=store.get(p.id);assert.equal(next.rulesHash,rulesHash);assert.equal(questionState(next,0).draftHash,before.draftHash);assert.equal(questionState(next,0).status,'approved');assert.equal(questionState(next,1).draftHash,sibling.draftHash);assert.equal(questionState(next,1).status,'pending');assert.doesNotThrow(()=>approvedQuestion(next,0));}finally{store.close();rmSync(dir,{recursive:true,force:true});}
+ try{const p=parent(store,config.rules.visualOnlyFromHashes.at(-1));approveFixture(p,0);store.save(p);const before=questionState(p,0),sibling=questionState(p,1);reconcileRules(store);const next=store.get(p.id);assert.equal(next.rulesHash,rulesHash);assert.equal(questionState(next,0).draftHash,before.draftHash);assert.equal(questionState(next,0).status,'approved');assert.equal(questionState(next,1).draftHash,sibling.draftHash);assert.equal(questionState(next,1).status,'pending');assert.doesNotThrow(()=>approvedQuestion(next,0));}finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
 test('paid mismatch is blocked; a matching older source is rebuilt after only its own approval with no provider call',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'voice-rebuild-')),store=new Store(join(dir,'db'));let paid=0;

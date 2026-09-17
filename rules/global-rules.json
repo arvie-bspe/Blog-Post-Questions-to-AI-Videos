@@ -1,14 +1,15 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.3",
   "status": "active_replacement",
-  "verifiedAt": "2026-09-16",
+  "verifiedAt": "2026-09-17",
   "rules": {
     "contentSections": 36,
     "appearanceSections": 100,
     "master": "GLOBAL_RULES.md",
-    "sha256": "384bfd991956eba3eb39d3c8bfb7ad68c5cf0a11d078480e0344c42d6c7d4bdc",
+    "sha256": "7c256597c7eaa8baf944519d0a8dc86767a5d0b81a1a8b3fb5949d02a1bca06b",
     "visualOnlyFromHashes": [
-      "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd"
+      "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd",
+      "384bfd991956eba3eb39d3c8bfb7ad68c5cf0a11d078480e0344c42d6c7d4bdc"
     ],
     "perQuestionMigrationFromHashes": [
       "deea6ce91ea2cadd559a6b49e9ad02dca60fcbb5537b72cb0283317ee37e4b36"
@@ -162,6 +163,25 @@
     "automaticSelection": true,
     "endCardLogo": true,
     "avatarVoiceGenderMatchRequired": true,
+    "presenterGenderEvidenceSource": "lawyer_blurb_only",
+    "presenterGenderAllowedEvidence": [
+      "explicit_gendered_pronouns",
+      "other_clear_explicit_gender_references"
+    ],
+    "presenterGenderForbiddenInference": [
+      "name",
+      "photograph_or_image",
+      "physical_appearance",
+      "voice",
+      "firm_name",
+      "practice_area",
+      "outside_research",
+      "general_assumptions",
+      "other_google_doc_sections"
+    ],
+    "mixedExplicitGenderAction": "approved_male_or_female_presenter",
+    "unknownSourceGenderAction": "default_approved_pool_without_gender_requirement",
+    "reviewerGenderCorrection": "new_cpu_render_with_same_gender_voice",
     "unknownGenderAction": "hold_before_paid_submission",
     "faceDetectorVersion": "yunet-2023mar-1"
   },

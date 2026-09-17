@@ -24,3 +24,10 @@ export function presenterGender(doc,context){
  if(context?.gender==='female'&&female&&!male)return 'female';
  return null;
 }
+export function permittedPresenterGender(doc,context,requested){
+ const choice=clean(requested).toLowerCase();
+ if(!['male','female'].includes(choice))throw new Error('Choose a male or female presenter from the approved generic pool.');
+ const required=presenterGender(doc,context);
+ if(required&&choice!==required)throw new Error(`PRESENTER_SOURCE_GENDER_MISMATCH: the explicit lawyer blurb requires an approved ${required} presenter and matching ${required} voice.`);
+ return choice;
+}

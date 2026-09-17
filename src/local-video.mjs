@@ -3,7 +3,7 @@ import {copyFileSync,readFileSync,existsSync} from 'node:fs';
 import {join} from 'node:path';
 import {hash} from './domain.mjs';
 import {approved,scriptText,captions} from './video-domain.mjs';
-import {requireArticleIdentity,presenterGender} from './article-identity.mjs';
+import {requireArticleIdentity,presenterGender,permittedPresenterGender} from './article-identity.mjs';
 import {endCardData,layoutVersion,detectorVersion} from './visual-checks.mjs';
 import {matchingPresenter,presenterPool} from './presenter-compatibility.mjs';
 import {durationOf} from './media.mjs';
@@ -19,28 +19,28 @@ const mode=provider=>{if(!isWorkerVideoProvider(provider)||!modes[provider])thro
 export const localAvatar=presenterPool.avatars.find(a=>a.id==='local-studio-presenter-01');
 export const localVoice=presenterPool.voices.find(v=>v.id==='am_michael');
 
-function workerPresenter(job,index,provider){
-  const selected=mode(provider),required=presenterGender(job.doc,job.plan?.presenterContext),avatars=presenterPool.avatars.filter(a=>a.type===selected.avatarType&&(!required||a.gender===required));
+function workerPresenter(job,index,provider,requestedGender=null){
+  const selected=mode(provider),required=presenterGender(job.doc,job.plan?.presenterContext),target=requestedGender?permittedPresenterGender(job.doc,job.plan?.presenterContext,requestedGender):required,avatars=presenterPool.avatars.filter(a=>a.type===selected.avatarType&&(!target||a.gender===target));
   const pairs=avatars.flatMap(avatar=>presenterPool.voices.filter(voice=>voice.type==='local_tts'&&voice.gender===avatar.gender).map(voice=>({avatar,voice})));
   const label=provider==='liteavatar_worker'?'LiteAvatar':'local';
-  if(!pairs.length)throw new Error(required?`No approved ${label} ${required} presenter and matching voice are configured.`:`No approved ${label} presenter and matching voice are configured.`);
-  const pair=pairs[parseInt(hash([job.id,index,provider,'worker-presenter']).slice(0,8),16)%pairs.length];matchingPresenter(pair.avatar,pair.voice);return pair;
+  if(!pairs.length)throw new Error(target?`No approved ${label} ${target} presenter and matching voice are configured.`:`No approved ${label} presenter and matching voice are configured.`);
+  const pair=pairs[parseInt(hash([job.id,index,provider,'worker-presenter',target||'default']).slice(0,8),16)%pairs.length];matchingPresenter(pair.avatar,pair.voice);return {...pair,selection:{method:requestedGender?'reviewer_gender_correction':'automatic_curated_pool',genderRequirement:required||'unspecified',selectedGender:pair.avatar.gender,lawyerBlurbParagraphIds:job.plan?.presenterContext?.lawyerBlurbParagraphIds||[]}};
 }
 
-export function prepareWorkerVideo(job,index,provider='local_worker'){
+export function prepareWorkerVideo(job,index,provider='local_worker',requestedGender=null){
   if(job.setupIssues?.length)throw new Error(job.setupIssues.join(' '));
-  const selected=mode(provider),approvalHash=approved(job,index),video=job.plan.videos[index];if(!video)throw new Error('Choose one approved question.');const {avatar,voice}=workerPresenter(job,index,provider);
+  const selected=mode(provider),approvalHash=approved(job,index),video=job.plan.videos[index];if(!video)throw new Error('Choose one approved question.');const {avatar,voice,selection}=workerPresenter(job,index,provider,requestedGender);
   const script=scriptText(video),articleIdentity=requireArticleIdentity(job.doc,job.plan.articleIdentity),endCard={...endCardData({articleIdentity,script,source:{targetUrl:job.row.pageUrl}}),seconds:3};
   const wordCount=script.trim().split(/\s+/).filter(Boolean).length,title=String(video.thumbnailTitle||video.question.replace(/\?$/,'')).trim().split(/\s+/).slice(0,6).join(' ');
-  const data={provider,layoutVersion,endCard,articleIdentity,parentId:job.id,index,approvalHash,script,scriptHash:hash(script),question:video.question,thumbnailTitle:title,avatar,voice,client:job.client,
+  const data={provider,layoutVersion,endCard,articleIdentity,parentId:job.id,index,approvalHash,script,scriptHash:hash(script),question:video.question,thumbnailTitle:title,avatar,voice,selection,client:job.client,
     source:{documentUrl:job.row.documentUrl,sourceHash:job.doc.sourceHash,mode:job.mode,rulesHash:appearanceRulesHash,folderUrl:job.row.folderUrl,targetUrl:job.row.pageUrl},models:selected.models,format:{width:1080,height:1920,aspectRatio:'9:16'},logoRequired:true,outputRevision:1,targetSeconds:30,wordCount,estimatedSeconds:Math.max(1,Math.ceil(wordCount/2.2)),renderEstimate:0,prices:{currency:'USD',providerCharge:0,hosting:'Railway usage'},identity:hash([provider,job.id,index,approvalHash,avatar.id,voice.id,title,layoutVersion,appearanceRulesHash]),status:'prepared',requests:{},files:{},reviews:[]};
   return {...data,id:randomUUID(),created:now(),createdBy:'system'};
 }
 
 export const prepareLocal=(job,index)=>prepareWorkerVideo(job,index,'local_worker');
 
-export async function queueWorkerVideo(service,parent,index,actor,provider=videoProvider(service.env)){
-  const data=prepareWorkerVideo(parent,index,provider),existing=service.db.prepare('SELECT payload FROM videos WHERE identity=?').get(data.identity);
+export async function queueWorkerVideo(service,parent,index,actor,provider=videoProvider(service.env),requestedGender=null){
+  const data=prepareWorkerVideo(parent,index,provider,requestedGender),existing=service.db.prepare('SELECT payload FROM videos WHERE identity=?').get(data.identity);
   if(existing){
     const saved=JSON.parse(existing.payload);
     if(!saved.workerTaskId&&['prepared','needs_attention','failed'].includes(saved.status))return finishWorkerSetup(service,saved,parent,actor);
@@ -73,8 +73,10 @@ export async function retryWorkerVideo(service,id,actor){
   return enqueueWorkerRecord(service,data,parent,actor);
 }
 
-export async function queueLocalReplacement(service,old,actor){
-  const parent=service.store.get(old.parentId),selected=mode(old.provider),replacement={...structuredClone(old),id:randomUUID(),identity:hash([old.id,`${old.provider}_replacement`,now()]),previousVideoId:old.id,generationVersion:(old.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,technicalQA:null,workerTaskId:null,models:selected.models,motionTuning:old.provider==='liteavatar_worker'?'mouth-lowpass-7hz; pause-closure-200ms':null};
+export async function queueLocalReplacement(service,old,actor,requestedGender=null){
+  const parent=service.store.get(old.parentId),selected=mode(old.provider),pair=requestedGender?workerPresenter(parent,old.index,old.provider,requestedGender):{...matchingPresenter(old.avatar,old.voice),selection:old.selection};
+  if(requestedGender&&old.avatar?.gender===pair.avatar.gender&&old.voice?.gender===pair.voice.gender)throw new Error(`This video already uses an approved ${pair.avatar.gender} presenter and matching voice.`);
+  const replacement={...structuredClone(old),id:randomUUID(),identity:hash([old.id,`${old.provider}_replacement`,requestedGender||'same-pair',now()]),avatar:{...pair.avatar},voice:{...pair.voice},selection:pair.selection||old.selection,previousVideoId:old.id,generationVersion:(old.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,technicalQA:null,workerTaskId:null,models:selected.models,motionTuning:old.provider==='liteavatar_worker'?'mouth-lowpass-7hz; pause-closure-200ms':null};
   service.save(replacement);old.status='changes_requested';if(old.revisionRequest){old.revisionRequest.status='replacement_started';old.revisionRequest.replacementId=replacement.id;}service.save(old);await service.ensureLogo(replacement);return enqueueWorkerRecord(service,replacement,parent,actor);
 }
 

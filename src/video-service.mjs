@@ -14,6 +14,7 @@ import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
 import {applyLocalVideoTask,finishWorkerVideo,retryWorkerVideo} from './local-video.mjs';
 import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
 import {rulesHash,appearanceRulesHash} from './rules.mjs';
+import {presenterGender} from './article-identity.mjs';
 const error=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 export const publicJob=j=>{if(!j)return j;const {requests,identity,...rest}=j,known=j.provider==='heygen'||isWorkerVideoProvider(j.provider);return {...rest,presenterIssue:known?presenterIssue(j.avatar,j.voice):null,provider:j.provider||'fal.ai',legacy:!known,requests:Object.fromEntries(Object.entries(requests||{}).map(([stage,r])=>[stage,{id:r.id||null,state:r.state,submittedAt:r.submittedAt||null}]))};};
@@ -65,13 +66,15 @@ export class VideoService {
     const nextToken=result.has_more&&typeof result.next_token==='string'?result.next_token:null,page={items,nextToken};
     if(this.pages.size>100)this.pages.clear();this.pages.set(key,{page,expires:Date.now()+300000});return page;
   }
-  async validate(j){
+  async validate(j,{allowPresenterCorrection=false}={}){
     if(!j.provider)error('This is a saved fal.ai setup. Prepare a new video from the current approved script; the old record is kept for history.',409);
     if(j.provider!=='heygen'&&!isWorkerVideoProvider(j.provider))error('This is a saved legacy setup. Prepare a new video from the current approved script; the old record is kept for history.',409);
     if(j.layoutVersion!==layoutVersion)error('This video uses the previous layout. Rebuild it with the current layout before review or delivery.',409);
-    matchingPresenter(j.avatar,j.voice);
+    let pair;try{pair=matchingPresenter(j.avatar,j.voice);}catch(cause){if(!allowPresenterCorrection)throw cause;}
     if(j.files?.video&&j.detectorVersion!==detectorVersion)error('Rebuild this saved footage with the current framing checks before video review or delivery. No new HeyGen render is needed.',409);
-    const parent=this.store.get(j.parentId);if(approved(parent,j.index)!==j.approvalHash)error('The source or script review changed. Prepare from the current approved version.',409);
+    const parent=this.store.get(j.parentId),requiredGender=presenterGender(parent.doc,parent.plan?.presenterContext);
+    if(!allowPresenterCorrection&&requiredGender&&pair?.avatar.gender!==requiredGender)error(`PRESENTER_SOURCE_GENDER_MISMATCH: the explicit lawyer blurb requires an approved ${requiredGender} presenter and matching ${requiredGender} voice.`,409);
+    if(approved(parent,j.index)!==j.approvalHash)error('The source or script review changed. Prepare from the current approved version.',409);
     await this.checkFresh(parent,j.index);if(approved(this.store.get(j.parentId),j.index)!==j.approvalHash)error('The content review changed during this request.',409);
   }
   async applyWorkerTask(task){return applyLocalVideoTask(this,task);}

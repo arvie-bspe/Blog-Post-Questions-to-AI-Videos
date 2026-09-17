@@ -10,7 +10,7 @@ Production app: [Article Video Studio](https://article-video-studio-production.u
 2. Railway retrieves and fingerprints that tab. The Monthly Sheet is not read by this workflow.
 3. The configured AI resolver independently reviews the article, selects useful explicit questions or formulates source-supported questions, drafts approximately 30-second scripts, and attaches exact article evidence to every answer sentence.
 4. Keziah reviews each script separately. **Request changes** queues an AI rewrite for that question only. Sibling scripts and approvals stay unchanged.
-5. Approving one script queues only that video's Railway CPU media task. The worker uses a reviewed LiteAvatar profile, a verified same-gender Kokoro ONNX voice, LiteAvatar motion, and the speech model's measured duration timing.
+5. Approving one script queues only that video's Railway CPU media task. The worker uses a reviewed LiteAvatar profile selected from explicit lawyer-blurb gender evidence, a verified same-gender Kokoro ONNX voice, LiteAvatar motion, and the speech model's measured duration timing. Video review can request a source-compatible presenter-gender replacement; the presenter and voice change together in a new CPU render.
 6. Railway creates the 1080 × 1920 output with synchronized captions, the homepage logo, thumbnail, and a separate three-second contact end card.
 7. Macy reviews each finished video separately. A layout change reuses existing media; a wording change returns to Keziah; a voice or lip-sync change queues a new render.
 8. Macy's approval automatically uploads the MP4, thumbnail, and VTT captions to the job's Google Drive Visual folder.

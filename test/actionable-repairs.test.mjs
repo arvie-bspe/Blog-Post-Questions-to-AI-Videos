@@ -8,6 +8,7 @@ import {AccountStore} from '../src/accounts.mjs';
 import {createApp,isCurrentVideo} from '../src/server.mjs';
 import {recordQuestionReview,approvedQuestion} from '../src/question-approval.mjs';
 import {prepareWorkerVideo,queueWorkerVideo} from '../src/local-video.mjs';
+import {presenterPool} from '../src/presenter-compatibility.mjs';
 import {appearanceRulesHash,config,rulesHash} from '../src/rules.mjs';
 import {directMode,scriptPolicyHash} from '../src/workflow-config.mjs';
 import {videoNeedsRebuild} from '../public/video-ui.js';
@@ -53,6 +54,18 @@ test('a logo failure resumes the same setup and queues exactly one render',async
   try{const parent=app.store.create(approve(source('logo-retry')));let calls=0;app.video.ensureLogo=async()=>{calls++;if(calls===1)throw new Error('Synthetic logo failure');};
     await assert.rejects(queueWorkerVideo(app.video,parent,0,'Reviewer'),/logo/);const retried=await queueWorkerVideo(app.video,parent,0,'Reviewer');
     assert.equal(calls,2);assert.equal(retried.status,'working');assert.ok(retried.workerTaskId);assert.equal(app.video.list(parent.id).length,1);
+  }finally{app.video.closed=true;app.store.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('video review changes presenter gender and voice together while enforcing the lawyer blurb',async()=>{
+  const dir=mkdtempSync(join(tmpdir(),'gender-correction-')),env={HOST:'127.0.0.1',PORT:'4199',APP_ORIGIN:'http://127.0.0.1:4199',DATA_DIR:dir,VIDEO_PROVIDER:'liteavatar_worker',STUDIO_WORKER_TOKEN:'synthetic-worker-token-123456789'},app=createApp(env);app.video.checkFresh=async()=>{};app.video.ensureLogo=async()=>{};
+  try{
+    const mixed=source('mixed-gender-review');mixed.doc.paragraphs.find(p=>p.id==='p5').text='One lawyer explains that he handles appeals, while another says her practice focuses on hearings.';mixed.plan.presenterContext={gender:'mixed',lawyerBlurbParagraphIds:['p5']};const parent=app.store.create(approve(mixed));
+    const original=prepareWorkerVideo(parent,0,'liteavatar_worker'),requested=original.avatar.gender==='male'?'female':'male';original.voice={...presenterPool.voices.find(v=>v.type==='local_tts'&&v.gender===requested)};original.status='visual_review';original.detectorVersion=config.video.faceDetectorVersion;original.files={video:true};app.video.save(original);
+    const replacement=await app.video.review(original.id,{decision:'reject',note:'Use the other permitted presenter gender and matching voice.',changeType:'gender',presenterGender:requested,expectedOutputRevision:1},'Reviewer');
+    assert.notEqual(replacement.id,original.id);assert.equal(replacement.avatar.gender,requested);assert.equal(replacement.voice.gender,requested);assert.equal(replacement.selection.method,'reviewer_gender_correction');assert.equal(app.video.get(original.id).status,'changes_requested');assert.equal(app.tasks.get(replacement.workerTaskId).type,'media_liteavatar');
+    const strictParent=app.store.create(approve(source('single-male-blurb'))),strict=prepareWorkerVideo(strictParent,0,'liteavatar_worker');strict.status='visual_review';strict.detectorVersion=config.video.faceDetectorVersion;strict.files={video:true};app.video.save(strict);
+    await assert.rejects(app.video.review(strict.id,{decision:'reject',note:'Use a female presenter for this test request.',changeType:'gender',presenterGender:'female',expectedOutputRevision:1},'Reviewer'),/explicit lawyer blurb requires an approved male presenter/);assert.equal(app.video.get(strict.id).status,'visual_review');assert.equal(app.video.get(strict.id).reviews.length,0);
   }finally{app.video.closed=true;app.store.close();rmSync(dir,{recursive:true,force:true});}
 });
 

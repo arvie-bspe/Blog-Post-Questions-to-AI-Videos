@@ -1,6 +1,6 @@
 # Article Video Studio — Global Rules
 
-Version 1.4.2 · Updated September 16, 2026
+Version 1.4.3 · Updated September 17, 2026
 
 ## Active sources and workflow
 
@@ -34,6 +34,43 @@ The avatar and voiceover must have the same gender on every video. Match verifie
 Existing mismatched footage cannot pass video review or delivery. Correct it using matching, previously purchased footage only if the exact approved script and article still match; otherwise prepare an explicitly authorized paid replacement. Preserving a previous voice on regeneration never overrides this matching requirement.
 
 Source framing checks must distinguish real faces from background or clothing false positives. Use the bundled local face detector on every frame, retaining head and upper-torso crop safeguards. A confirmed second face or unreliable tracking holds the output. Store the detector version and failure frame for diagnosis. Updated local framing checks and final assembly may reuse existing footage without a new HeyGen charge; they do not grant a missing script approval or Macy approval.
+
+## Presenter gender selection — user update September 17, 2026
+
+Select the presenter from the approved generic presenter pool.
+
+Before selecting a presenter, locate the lawyer blurb in the source Google Doc. The lawyer blurb is the section that describes the attorney or attorneys associated with the page. It will usually include information such as their professional background, qualifications, education, admissions, practice areas, memberships, or experience.
+
+Use only the text in the lawyer blurb to determine the gender represented by the attorney or attorneys.
+
+Determine gender only from explicit information in the lawyer blurb, such as:
+
+- Gendered pronouns, including she, her, he, him, or his
+- Other clear and explicit gender references
+
+Do not infer gender from:
+
+- Name
+- Photograph or image
+- Physical appearance
+- Voice
+- Firm name
+- Practice area
+- Outside research
+- General assumptions
+
+Presenter selection follows these rules:
+
+- If one attorney is represented and the lawyer blurb explicitly establishes that attorney as female, select an approved female generic presenter.
+- If one attorney is represented and the lawyer blurb explicitly establishes that attorney as male, select an approved male generic presenter.
+- If multiple attorneys are represented and all explicitly established genders are female, select an approved female generic presenter.
+- If multiple attorneys are represented and all explicitly established genders are male, select an approved male generic presenter.
+- If attorneys of different explicitly established genders are represented, either an approved male or female generic presenter may be selected.
+- If the lawyer blurb does not contain enough explicit information to establish gender, do not guess or use outside information. Use the default presenter selection behavior.
+
+Only use gender information found in the lawyer blurb. Do not use other parts of the Google Doc to infer the attorney's gender.
+
+A reviewer may request a different presenter gender from the video review controls. The replacement must still follow the lawyer-blurb rules above, must come from the approved generic presenter pool, and must use a verified voice with the same gender as the selected presenter. A presenter-gender change requires a new talking-video render; it must never reuse a voice of a different gender.
 
 ## Complete video content and script rules
 
