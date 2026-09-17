@@ -58,13 +58,15 @@ Keep the Windows worker on `STUDIO_WORKER_TYPES=ai_codex` after the current SadT
 
 ## Railway LiteAvatar CPU trial
 
-Add a second service from this repository and set its Railway config file to `railway.liteavatar.json` (or its Dockerfile path to `Dockerfile.liteavatar`). Give it only:
+Add a second service from this repository and set its Dockerfile path to `Dockerfile.liteavatar`. Give it only:
 
 - `STUDIO_URL=https://article-video-studio-production.up.railway.app`
 - the same private `STUDIO_WORKER_TOKEN` as the web app
 - `STUDIO_WORKER_TYPES=media_liteavatar`
 
 The image pins LiteAvatar source and every downloaded model/profile asset by SHA-256. It bundles Kokoro INT8, one male profile, and one female profile. The service has no public domain and polls the existing durable task queue over outbound HTTPS. The profiles are marked `evaluation_only`; Macy can test their quality, but Drive delivery remains blocked until commercial-use rights are documented and `LITEAVATAR_ASSET_RIGHTS_CONFIRMED=true` is set on the web app.
+
+For a one-time end-to-end container check, set `LITEAVATAR_STARTUP_SMOKE=1`, deploy, wait for `LiteAvatar CPU startup smoke render passed.` in the service logs, then save the variable as `0` without redeploying the running worker.
 
 LiteAvatar is CPU-only, but its 880 MB speech-feature model plus PyTorch require substantially more than a 1 GB container during rendering. Set a 30-minute render timeout and start with at least 4 GB RAM. Railway bills CPU and memory usage even though there is no per-video provider fee. Keep one worker replica and one render at a time for the trial.
 
