@@ -30,7 +30,7 @@ export class VideoService {
     this.automation=new ApprovalVideoAutomation(this);
     queueMicrotask(()=>{if(!this.closed)for(const j of this.list()){
       if(j.status==='delivery_pending')this.deliver(j.id);
-      else if(isWorkerVideoProvider(j.provider)&&j.status==='compositing'&&j.stage==='compositing'&&j.files?.original&&j.files?.voice&&!j.files?.video)this.resumeWorkerComposition(j);
+      else if(isWorkerVideoProvider(j.provider)&&j.stage==='compositing'&&j.files?.original&&j.files?.voice&&!j.files?.video&&(j.status==='compositing'||(j.status==='needs_attention'&&/SOURCE_FRAMING_INCOMPATIBLE|CAPTION_TIMING_REQUIRED/.test(j.error||''))))this.resumeWorkerComposition(j);
     }});
   }
   list(parent){const rows=parent?this.db.prepare('SELECT payload FROM videos WHERE parent=? ORDER BY updated DESC').all(parent):this.db.prepare('SELECT payload FROM videos ORDER BY updated DESC').all();return rows.map(r=>JSON.parse(r.payload));}

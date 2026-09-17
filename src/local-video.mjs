@@ -70,7 +70,9 @@ export async function applyLocalVideoTask(service,task){
 
 export async function finishWorkerVideo(service,j,taskId=null){
   try{
-    j.technicalQA=await service.compose(service.media,service.directory(j),j);j.detectorVersion=detectorVersion;await service.validate(j);j.status='visual_review';j.stage='visual_review';j.error=null;j.files={...j.files,video:true,thumbnail:true,captions:true,manifest:true};service.save(j);service.manifest(j);if(taskId)service.tasks.markApplied(taskId);return j;
+    const dir=service.directory(j),alignmentPath=join(dir,'alignment.json');
+    if(existsSync(alignmentPath)){const alignment=JSON.parse(readFileSync(alignmentPath,'utf8'));j.cues=captions(alignment,j.script,j.question,j.duration);service.save(j);}
+    j.technicalQA=await service.compose(service.media,dir,j);j.detectorVersion=detectorVersion;await service.validate(j);j.status='visual_review';j.stage='visual_review';j.error=null;j.files={...j.files,video:true,thumbnail:true,captions:true,manifest:true};service.save(j);service.manifest(j);if(taskId)service.tasks.markApplied(taskId);return j;
   }catch(e){
     j.status='needs_attention';j.stage='compositing';j.error=String(e.message||e).slice(0,4000);service.save(j);throw e;
   }

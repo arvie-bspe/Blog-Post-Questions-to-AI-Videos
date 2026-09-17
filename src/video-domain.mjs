@@ -32,7 +32,9 @@ export function captions(alignment,script,question,duration){
     const {start,end}=word;
     if(!Number.isFinite(start)||!Number.isFinite(end)||start<previous-0.05||start<0||end<=start||end>duration+0.12)throw new Error('Alignment contains missing, overlapping, or out-of-range word timings.');
     const isQuestion=offset<questionEnd,text=String(word.text).trim();offset+=canonical(text).length;previous=end;
-    if(!cue||cue.question!==isQuestion||cue.text.length+text.length>72||end-cue.start>4.5){cue={start,end,text: isQuestion?text.toUpperCase():text,question:isQuestion};cues.push(cue);}
+    // Word timestamps are available here, so keep each timed caption compact
+    // enough for two readable portrait lines without estimating new timings.
+    if(!cue||cue.question!==isQuestion||cue.text.length+text.length+1>44||end-cue.start>3.5){cue={start,end,text: isQuestion?text.toUpperCase():text,question:isQuestion};cues.push(cue);}
     else{cue.text+=' '+(isQuestion?text.toUpperCase():text);cue.end=end;}
   }
   return cues;

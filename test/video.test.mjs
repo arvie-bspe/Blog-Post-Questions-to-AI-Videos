@@ -33,6 +33,9 @@ test('caption timing requires every approved word and valid measured boundaries'
   assert.throws(()=>captions(alignment,'What? A different answer.','What?',2),/every word/);
   assert.throws(()=>captions(alignment,'What? An answer.','What?',1),/out-of-range/);
   assert.throws(()=>captions({words:[{text:'What?',start:1,end:0}]},'What?','What?',2),/timings/);
+  const long='Preparing your financial documents and identifying every issue before the first session may reduce costs.';
+  const timed=long.split(' ').map((text,i)=>({text,start:i*.3,end:i*.3+.25})),split=captions({words:timed},long,'Different question?',timed.at(-1).end+.1);
+  assert.ok(split.length>=3);assert.ok(split.every(c=>c.text.length<=44));
 });
 test('fal credentials and downloads cannot be redirected to arbitrary hosts',async()=>{
   for(const u of ['http://fal.media/a','https://fal.media.evil.test/a','https://localhost/a','file:///etc/passwd','https://user:secret@fal.media/a','https://fal.media:444/a'])assert.throws(()=>mediaURL(u));
