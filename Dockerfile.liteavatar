@@ -3,7 +3,13 @@ FROM python:3.10-slim-bookworm AS dependencies
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 WORKDIR /build
 COPY worker/liteavatar-requirements.txt ./requirements.txt
-RUN python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+# LiteAvatar's pinned PyTorch build requires NumPy 1.x. Kokoro 0.6.1's
+# package metadata asks for NumPy 2.x even though its runtime operations here
+# are compatible with the pinned NumPy 1.x stack, so install its declared
+# dependencies explicitly and then install the small wrapper without deps.
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -r requirements.txt \
+    && python -m pip install --no-deps kokoro-onnx==0.6.1
 
 FROM python:3.10-slim-bookworm AS runtime
 

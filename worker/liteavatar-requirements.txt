@@ -25,4 +25,5 @@ jamo==0.4.1
 jieba==0.42.1
 transformers==4.44.1
 torch-complex==0.4.4
-kokoro-onnx==0.6.1
+espeakng-loader==0.2.4
+phonemizer==3.4.0
