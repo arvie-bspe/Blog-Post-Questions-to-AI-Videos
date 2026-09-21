@@ -208,6 +208,7 @@ export function createApp(env=process.env){
           if(typeof body.note!=='string'||body.note.trim().length<10||body.note.length>4000)fail('Add review notes of 10 to 4000 characters.');
           if(job.mode===directMode?job.scriptRulesHash!==scriptPolicyHash:job.rulesHash!==rulesHash)fail('The script policy changed. Refresh and review this question.',409);
           await checkFresh(job);assertCurrent(job);
+          if(body.decision==='reject'&&(current.status==='analyzing'||['analyzing','interrupted'].includes(job.status)))fail('This question or article is already being revised. Wait for the current request.',409);
           if(body.decision==='approve'){
             if(current.status==='revision_pending'||current.status==='analyzing')fail('Apply this question’s requested changes before approving it.',409);
             if(current.status==='approved')fail('This question is already approved. Repeated approval will not generate another video.',409);

@@ -19,7 +19,7 @@ export function requireArticleIdentity(doc,input){
 export function presenterGender(doc,context){
  const ids=context?.lawyerBlurbParagraphIds||[];
  const text=doc.paragraphs.filter(p=>ids.includes(p.id)&&p.style==='NORMAL_TEXT').map(p=>p.text).join(' ');
- const male=/\b(he|his|him|male)\b/i.test(text),female=/\b(she|hers|her|female)\b/i.test(text);
+  const male=/\b(he|his|him|male|man|men)\b/i.test(text),female=/\b(she|hers|her|female|woman|women)\b/i.test(text);
  if(context?.gender==='male'&&male&&!female)return 'male';
  if(context?.gender==='female'&&female&&!male)return 'female';
  return null;

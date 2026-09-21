@@ -64,7 +64,8 @@ async function enqueueWorkerRecord(service,data,parent,actor){
 }
 export async function retryWorkerVideo(service,id,actor){
   const data=service.get(id);if(!isWorkerVideoProvider(data.provider))throw new Error('Only a self-hosted worker video can use this retry.');
-  if(!['failed','needs_attention'].includes(data.status))throw new Error('Only a failed worker video can be retried.');
+  const unfinishedSetup=data.status==='prepared'&&!data.workerTaskId;
+  if(!unfinishedSetup&&!['failed','needs_attention'].includes(data.status))throw new Error('Only a failed worker video or an unfinished setup can be retried.');
   const parent=service.store.get(data.parentId);await service.validate(data);
   if(data.stage==='logo_setup'||!data.workerTaskId)return finishWorkerSetup(service,data,parent,actor);
   if(data.files?.original&&data.files?.voice){data.status='compositing';data.stage='compositing';data.error=null;service.save(data);service.resumeWorkerComposition(data);return data;}
@@ -77,7 +78,7 @@ export async function queueLocalReplacement(service,old,actor,requestedGender=nu
   const parent=service.store.get(old.parentId),selected=mode(old.provider),pair=requestedGender?workerPresenter(parent,old.index,old.provider,requestedGender):{...matchingPresenter(old.avatar,old.voice),selection:old.selection};
   if(requestedGender&&old.avatar?.gender===pair.avatar.gender&&old.voice?.gender===pair.voice.gender)throw new Error(`This video already uses an approved ${pair.avatar.gender} presenter and matching voice.`);
   const replacement={...structuredClone(old),id:randomUUID(),identity:hash([old.id,`${old.provider}_replacement`,requestedGender||'same-pair',now()]),avatar:{...pair.avatar},voice:{...pair.voice},selection:pair.selection||old.selection,previousVideoId:old.id,generationVersion:(old.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,technicalQA:null,workerTaskId:null,models:selected.models,motionTuning:old.provider==='liteavatar_worker'?'mouth-lowpass-7hz; pause-closure-200ms':null};
-  service.save(replacement);old.status='changes_requested';if(old.revisionRequest){old.revisionRequest.status='replacement_started';old.revisionRequest.replacementId=replacement.id;}service.save(old);await service.ensureLogo(replacement);return enqueueWorkerRecord(service,replacement,parent,actor);
+  service.save(replacement);old.status='changes_requested';if(old.revisionRequest){old.revisionRequest.status='replacement_started';old.revisionRequest.replacementId=replacement.id;}service.save(old);return finishWorkerSetup(service,replacement,parent,actor);
 }
 
 export async function applyLocalVideoTask(service,task){

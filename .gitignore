@@ -7,6 +7,14 @@ node_modules/
 test-results/
 work/
 fixtures/
+!test/fixtures/
+test/fixtures/*
+!test/fixtures/framing/
+test/fixtures/framing/*
+!test/fixtures/framing/README.md
+!test/fixtures/framing/jacket-1.jpg
+!test/fixtures/framing/jacket-2.jpg
+!test/fixtures/framing/two-people.jpg
 
 vendor/
 .env.tmp

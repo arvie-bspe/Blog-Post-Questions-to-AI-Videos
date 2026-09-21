@@ -11,5 +11,7 @@ COPY rules ./rules
 COPY assets ./assets
 RUN /opt/visual/bin/python -c "import sys; sys.path.insert(0, '/app/src'); from face_detector import FaceDetector; FaceDetector()"
 COPY bootstrap ./bootstrap
+COPY test ./test
+RUN LOGO_CHROMIUM_PATH=/usr/bin/chromium VISUAL_PYTHON_PATH=/opt/visual/bin/python node --test test/*.test.mjs
 ENV LOGO_CHROMIUM_PATH=/usr/bin/chromium HOST=0.0.0.0 DATA_DIR=/data NODE_ENV=production
 CMD ["node", "src/server.mjs"]

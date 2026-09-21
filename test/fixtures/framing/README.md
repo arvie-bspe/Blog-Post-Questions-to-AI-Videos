@@ -1,0 +1,1 @@
+Regression frames extracted from existing paid HeyGen test videos, September 16, 2026. Jacket folds caused Haar false positives at frames 347 and 273. The two-person fixture duplicates one complete presenter scene side-by-side to verify second-face rejection. These fixtures contain no credentials.
