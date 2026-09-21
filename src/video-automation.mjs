@@ -43,7 +43,12 @@ export class ApprovalVideoAutomation {
     if(!Number.isInteger(index))fail('Choose one approved question to start.');
     const missing=this.view(parent).missingApproved.find(item=>item.index===index);
     if(!missing)fail('This question is not approved or already has an automatic video run.',409);
-    return this.enqueue(parent,actor,index);
+    const profile=this.profile(parent);
+    if(profile?.enabled)return this.enqueue(parent,actor,index);
+    const provider=videoProvider(this.service.env);
+    if(!isWorkerVideoProvider(provider))fail('Automatic video generation is disabled for this article. An administrator must enable it before starting an approved video.',409);
+    const recoveryProfile={id:randomUUID(),policyVersion:presenterPool.version,mode:'single_approved_recovery',enabled:true,parent,authorizedBy:actor,authorizedAt:now(),authorization:'One approved video was started explicitly while article-wide automation remained disabled.'};
+    return this.enqueue(parent,actor,index,{profile:recoveryProfile,manualRecovery:true});
   }
 
   configure(parent,body,actor){
@@ -57,11 +62,11 @@ export class ApprovalVideoAutomation {
     this.db.prepare('INSERT OR REPLACE INTO video_automation_profiles VALUES(?,?)').run(parent,JSON.stringify(profile));
     this.service.store.record(parent,actor,'enable_video_after_content_approval');return this.view(parent);
   }
-  enqueue(parent,actor,index){
-    const profile=this.profile(parent);if(!profile?.enabled)return {status:'configuration_needed'};
+  enqueue(parent,actor,index,{profile=this.profile(parent),manualRecovery=false}={}){
+    if(!profile?.enabled)return {status:'configuration_needed'};
     const job=this.service.store.get(parent),approvalHash=approved(job,index),id=hash([parent,index,approvalHash]);
     const existing=this.db.prepare('SELECT payload FROM video_approval_queue WHERE id=?').get(id);if(existing)return JSON.parse(existing.payload);
-    const entry={id,parent,index,approvalHash,profile,triggeredBy:actor,created:now(),status:'queued',videos:[],selection:null};this.save(entry);
+    const entry={id,parent,index,approvalHash,profile,manualRecovery,triggeredBy:actor,created:now(),status:'queued',videos:[],selection:null};this.save(entry);
     queueMicrotask(()=>this.run(entry));return entry;
   }
   save(entry){this.db.prepare('INSERT INTO video_approval_queue VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated,payload=excluded.payload').run(entry.id,entry.parent,now(),JSON.stringify(entry));}
@@ -98,10 +103,12 @@ export class ApprovalVideoAutomation {
     const service=this.service;if(service.closed||this.active.has(entry.id))return;this.active.add(entry.id);
     try{
       if(!Number.isInteger(entry.index))throw new Error('Article-wide approval retired. Review each question separately; no new submission was made.');
-      this.assertProfile(entry.parent,entry.profile.id);
+      const provider=videoProvider(service.env);
+      if(entry.manualRecovery){
+        if(entry.profile?.mode!=='single_approved_recovery'||!isWorkerVideoProvider(provider))throw new Error('This one-time recovery is limited to the configured self-hosted video worker.');
+      }else this.assertProfile(entry.parent,entry.profile.id);
       const parent=service.store.get(entry.parent);if(approved(parent,entry.index)!==entry.approvalHash)throw new Error('This question or its review changed. A new individual approval is required.');
       await service.checkFresh(parent,entry.index);entry.status='working';entry.error=null;this.save(entry);
-      const provider=videoProvider(service.env);
       // The selected provider is authoritative for every saved article mode.
       // Historical live_google records must never fall through to a paid
       // provider after the workspace switches to a self-hosted worker.
@@ -131,3 +138,4 @@ export class ApprovalVideoAutomation {
     finally{this.active.delete(entry.id);}
   }
 }
+

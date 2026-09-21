@@ -47,6 +47,15 @@ test('an approved question with no automation run is exposed for one guarded rec
   assert.throws(()=>h.service.automation.startMissing(h.parent.id,'Arvie',1),/not approved/);
  }finally{h.close();}
 });
+test('an explicit recovery starts one worker video while a historical article profile stays disabled',async()=>{
+ const h=harness();try{
+  h.service.automation.configure(h.parent.id,settings,'Arvie');h.service.automation.configure(h.parent.id,{enabled:false},'Arvie');h.approve(0);
+  h.service.env.VIDEO_PROVIDER='liteavatar_worker';h.service.closed=true;
+  const entry=h.service.automation.startMissing(h.parent.id,'Arvie',0),state=h.service.automation.view(h.parent.id);
+  assert.equal(entry.manualRecovery,true);assert.equal(entry.profile.mode,'single_approved_recovery');assert.equal(entry.status,'queued');
+  assert.equal(state.missingApproved.length,0);assert.equal(state.runs.length,1);assert.equal(state.profile.enabled,false);
+ }finally{h.close();}
+});
 test('a missing key holds only the selected question; adding the key resumes exactly one submission',async()=>{
  const h=harness('');try{
   h.service.automation.configure(h.parent.id,settings,'Arvie');h.approve();h.service.automation.enqueue(h.parent.id,'Keziah',0);await settle(h);
@@ -74,3 +83,4 @@ test('matching paid output is rebound after individual approval without creating
   assert.equal(h.submissions.length,0);assert.equal(h.service.list().length,1);assert.equal(result.requests.video.id,'already-paid-provider-id');assert.equal(result.approvalHash,approvedQuestion(h.parent,0));assert.equal(result.approvalHistory[0].approvalHash,'old-bulk-hash');assert.equal(h.service.automation.view(h.parent.id).lastRun.reusedExisting,true);assert.equal(questionState(h.parent,1).status,'pending');
  }finally{h.close();}
 });
+
