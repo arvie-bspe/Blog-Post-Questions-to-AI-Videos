@@ -21,4 +21,3 @@ export function directSetupIssues(row,client){
   if(!client?.homepage)issues.push('Add the firm homepage before video generation.');
   return issues;
 }
-

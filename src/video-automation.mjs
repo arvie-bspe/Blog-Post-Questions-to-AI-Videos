@@ -138,4 +138,3 @@ export class ApprovalVideoAutomation {
     finally{this.active.delete(entry.id);}
   }
 }
-

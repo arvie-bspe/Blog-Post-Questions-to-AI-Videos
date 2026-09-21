@@ -83,4 +83,3 @@ test('matching paid output is rebound after individual approval without creating
   assert.equal(h.submissions.length,0);assert.equal(h.service.list().length,1);assert.equal(result.requests.video.id,'already-paid-provider-id');assert.equal(result.approvalHash,approvedQuestion(h.parent,0));assert.equal(result.approvalHistory[0].approvalHash,'old-bulk-hash');assert.equal(h.service.automation.view(h.parent.id).lastRun.reusedExisting,true);assert.equal(questionState(h.parent,1).status,'pending');
  }finally{h.close();}
 });
-

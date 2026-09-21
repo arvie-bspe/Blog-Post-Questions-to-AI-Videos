@@ -50,4 +50,3 @@ export async function mountVideo(parent,api,notify,account){
  async function poll(){if(!alive())return;try{await fetchState();if(!busy&&!root.querySelector('form:focus-within'))draw();else timer=setTimeout(poll,4500);}catch(e){notify(e.message);if(alive())timer=setTimeout(poll,10000);}}
  try{await fetchState();draw();}catch(e){if(alive())root.textContent=e.message;}
 }
-
