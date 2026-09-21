@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {containsContact,endCardData,layoutVersion} from '../src/visual-checks.mjs';
+import {containsContact,endCardData,layoutVersion,logoContrastBackground} from '../src/visual-checks.mjs';
 import {layoutText} from '../src/layout-text.mjs';
 import {visualSettings} from '../src/portrait-media.mjs';
 import {rules,config,rulesHash} from '../src/rules.mjs';
@@ -21,6 +21,11 @@ function parent(store,old=false){const raw=fixture('paul'),row=parseMonthly(fixt
 test('the two updated sources replace the standalone layout specification',()=>{
  const ids=[...rules.matchAll(/^### L(\d{2}) /gm)].map(m=>m[1]);assert.equal(ids.length,0);assert.equal(config.sources.macyLayout,undefined);assert.equal([...rules.matchAll(/^### C\d{2} /gm)].length,36);assert.equal([...rules.matchAll(/^### V\d{2,3} /gm)].length,100);
  assert.equal(config.video.endCardSeconds,3);assert.equal(config.video.endCardTargetUrlSource,'monthly_page_url_column_E');assert.equal(config.video.mainSceneFit,'cover_crop');assert.equal(config.video.mainSceneContactFields,false);
+});
+test('logo backgrounds select the stronger light or dark contrast',()=>{
+ assert.deepEqual(logoContrastBackground({relativeLuminance:.02}),{color:'#FFFFFF',tone:'light',foregroundLuminance:.02,contrastRatio:15});
+ assert.deepEqual(logoContrastBackground({relativeLuminance:.9}),{color:'#111111',tone:'dark',foregroundLuminance:.9,contrastRatio:17.08});
+ assert.throws(()=>logoContrastBackground({}),/MISSING_LOGO_CONTRAST_DATA/);
 });
 test('missing target URL and contact-bearing transcripts/assets are held instead of inferred or rewritten',()=>{
  const j={articleIdentity:{name:'Example Firm',address:'123 Main Street',phone:'(555) 123-4567'},script:'What happens next? Review the evidence.',endCard:{targetUrl:'https://example.com/article'}};

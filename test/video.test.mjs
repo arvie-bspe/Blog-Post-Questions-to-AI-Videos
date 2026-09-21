@@ -60,7 +60,7 @@ const hgSettings={index:0,avatarId:avatar.id,voiceId:voice.id,presenterAccepted:
 function shortParent(store){const j=parent(store);j.plan.videos.forEach(v=>v.sentences=v.sentences.slice(0,1));approveFixture(j);store.save(j);return j;}
 function harness({heygen={},media={check:async()=>true},limit=2,env={HEYGEN_API_KEY:'fake-test-key'}}={}){
   const dir=mkdtempSync(join(tmpdir(),'heygen-test-')),store=new Store(join(dir,'db'));
-  const provider={look:async()=>avatar,...heygen},service=new VideoService({store,env:{...env,DAILY_VIDEO_LIMIT:String(limit)},dataDir:dir,checkFresh:async()=>{},local:true,media,logos:{acquire:async()=>({path:presenterPath,domain:'test.example',hash:'fixture-logo'})},delivery:{deliver:async(job,dir,save)=>{job.status='delivered';save(job);}},heygen:provider});
+  const provider={look:async()=>avatar,...heygen},service=new VideoService({store,env:{...env,DAILY_VIDEO_LIMIT:String(limit)},dataDir:dir,checkFresh:async()=>{},local:true,media,logos:{acquire:async()=>({path:presenterPath,domain:'test.example',hash:'fixture-logo',screening:{relativeLuminance:.02}})},delivery:{deliver:async(job,dir,save)=>{job.status='delivered';save(job);}},heygen:provider});
   service.avatars.set(avatar.id,avatar);service.voices.set(voice.id,voice);
   return {dir,store,service,parent:shortParent(store),close(){service.closed=true;store.close();rmSync(dir,{recursive:true,force:true});}};
 }
@@ -211,7 +211,7 @@ test('one mocked HeyGen generation automatically assembles real media then waits
     }};
     const j=await h.service.create(h.parent.id,hgSettings,'Arvie');await h.service.start(j.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie');
     for(let i=0;i<1200&&h.service.active.has(j.id);i++)await new Promise(r=>setTimeout(r,25));
-    const result=h.service.get(j.id);assert.equal(result.status,'visual_review',result.error);assert.equal(submits,1);assert.equal(result.technicalQA.native1080,true);assert.equal(result.technicalQA.aspectRatio,'9:16');assert.equal(result.technicalQA.logoIncluded,true);assert.equal(result.files.video,true);assert.equal(result.files.captions,true);assert.equal(result.source.folderUrl,h.parent.row.folderUrl);assert.ok(existsSync(join(h.service.directory(result),'thumbnail.png')));
+    const result=h.service.get(j.id);assert.equal(result.status,'visual_review',result.error);assert.equal(submits,1);assert.equal(result.technicalQA.native1080,true);assert.equal(result.technicalQA.aspectRatio,'9:16');assert.equal(result.technicalQA.logoIncluded,true);assert.equal(result.technicalQA.logoBackground.color,'#FFFFFF');assert.equal(result.technicalQA.logoBackground.tone,'light');assert.equal(result.files.video,true);assert.equal(result.files.captions,true);assert.equal(result.source.folderUrl,h.parent.row.folderUrl);assert.ok(existsSync(join(h.service.directory(result),'thumbnail.png')));
     await assert.rejects(h.service.review(j.id,{decision:'approve',note:'Test approval without checks'},'Macy'),/Check lips/);
     const revised=await h.service.review(j.id,{decision:'reject',note:'Automated fixture: increase caption size for readability.',changeType:'layout',visualSettings:{captionSize:64,captionBottom:115,logoScale:1}},'Macy');assert.equal(revised.status,'compositing');
     for(let i=0;i<1200&&h.service.active.has(j.id);i++)await new Promise(r=>setTimeout(r,25));

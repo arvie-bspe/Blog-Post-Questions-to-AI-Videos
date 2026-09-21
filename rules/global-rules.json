@@ -1,15 +1,16 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "status": "active_replacement",
-  "verifiedAt": "2026-09-17",
+  "verifiedAt": "2026-09-21",
   "rules": {
     "contentSections": 36,
     "appearanceSections": 100,
     "master": "GLOBAL_RULES.md",
-    "sha256": "7c256597c7eaa8baf944519d0a8dc86767a5d0b81a1a8b3fb5949d02a1bca06b",
+    "sha256": "537bca81bf9b57d2aac4063c426b00232d7ceb9c24555e18af550f403b7b12ea",
     "visualOnlyFromHashes": [
       "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd",
-      "384bfd991956eba3eb39d3c8bfb7ad68c5cf0a11d078480e0344c42d6c7d4bdc"
+      "384bfd991956eba3eb39d3c8bfb7ad68c5cf0a11d078480e0344c42d6c7d4bdc",
+      "7c256597c7eaa8baf944519d0a8dc86767a5d0b81a1a8b3fb5949d02a1bca06b"
     ],
     "perQuestionMigrationFromHashes": [
       "deea6ce91ea2cadd559a6b49e9ad02dca60fcbb5537b72cb0283317ee37e4b36"
@@ -134,7 +135,7 @@
       "svgRasterizer": "headless_chromium_via_playwright",
       "implementationStatus": "implemented_google_authorization_separate"
     },
-    "layoutVersion": "two-state-2026-09-16",
+    "layoutVersion": "two-state-2026-09-21-logo-contrast",
     "mainSceneFit": "cover_crop",
     "mainSceneCoverage": 1,
     "mainSceneContactFields": false,
@@ -183,7 +184,20 @@
     "unknownSourceGenderAction": "default_approved_pool_without_gender_requirement",
     "reviewerGenderCorrection": "new_cpu_render_with_same_gender_voice",
     "unknownGenderAction": "hold_before_paid_submission",
-    "faceDetectorVersion": "yunet-2023mar-1"
+    "faceDetectorVersion": "yunet-2023mar-1",
+    "logoBackground": {
+      "required": true,
+      "selection": "maximum_luminance_contrast_from_visible_logo_pixels",
+      "darkLogoBackground": "#FFFFFF",
+      "lightLogoBackground": "#111111",
+      "horizontalPaddingPixels": 18,
+      "verticalPaddingPixels": 14,
+      "appliesTo": [
+        "main_scene",
+        "thumbnail",
+        "end_card"
+      ]
+    }
   },
   "workflow": {
     "approvalTaskTitle": "send for approval to client",
@@ -217,14 +231,31 @@
     "videoTrigger": "individual_question_approval",
     "futureRowTrigger": "kristian_social_poster_handoff",
     "automaticVideoRequiresConfiguredProfile": false,
-    "scriptChanges": "openai_rewrite_or_visible_manual_revision",
+    "scriptChanges": "codex_cli_rewrite_or_visible_manual_revision",
     "videoChanges": "layout_recomposition_or_explicit_paid_render_or_content_revision",
     "deliveryTrigger": "macy_approval",
     "liveInspectionStartsAnalysis": true,
     "automaticVideoSelection": "codex_curated_pool",
     "automaticEstimateLimit": 2,
     "approvalScope": "per_question",
-    "articleWideApprovalEnabled": false
+    "articleWideApprovalEnabled": false,
+    "productionPipeline": {
+      "orderedStages": [
+        "google_doc",
+        "codex_cli_script",
+        "keziah_script_approval",
+        "heygen_presenter_and_voiceover",
+        "railway_video_assembly",
+        "macy_video_review",
+        "google_drive_delivery"
+      ],
+      "scriptAuthor": "codex_cli",
+      "scriptReviewer": "Keziah",
+      "videoProvider": "heygen",
+      "assembler": "railway",
+      "videoReviewer": "Macy",
+      "delivery": "google_drive_visual_folder"
+    }
   },
   "configurationRequired": [
     "service_credentials",

@@ -28,8 +28,18 @@ def main():
    ys,xs=np.where(image[:,:,3]>8)
    if not len(xs):raise ValueError('MISSING_CLEAN_LOGO_ASSET: empty logo.')
    image=image[ys.min():ys.max()+1,xs.min():xs.max()+1]
+  if image.shape[2]==4:
+   alpha=image[:,:,3].astype(np.float32)/255.0
+   pixels=image[:,:,:3][:,:,::-1].astype(np.float32)/255.0
+   weights=alpha
+  else:
+   pixels=image[:,:,:3][:,:,::-1].astype(np.float32)/255.0
+   weights=np.ones(image.shape[:2],dtype=np.float32)
+  linear=np.where(pixels<=0.04045,pixels/12.92,((pixels+0.055)/1.055)**2.4)
+  luminance=linear[:,:,0]*0.2126+linear[:,:,1]*0.7152+linear[:,:,2]*0.0722
+  relative_luminance=float(np.sum(luminance*weights)/np.sum(weights))
   cv2.imwrite(path,image)
-  return {'texts':texts,'width':image.shape[1],'height':image.shape[0],'method':'local OCR; clean-logo identity and embedded-field review still required'}
+  return {'texts':texts,'width':image.shape[1],'height':image.shape[0],'relativeLuminance':round(relative_luminance,6),'method':'local OCR and visible-pixel luminance; clean-logo identity and embedded-field review still required'}
  cap=cv2.VideoCapture(path)
  if not cap.isOpened():raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: unreadable video.')
  width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH));height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT));fps=cap.get(cv2.CAP_PROP_FPS)

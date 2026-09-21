@@ -1,7 +1,15 @@
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-export const layoutVersion='two-state-2026-09-16';
+export const layoutVersion='two-state-2026-09-21-logo-contrast';
 export const detectorVersion='yunet-2023mar-1';
+const contrastRatio=(a,b)=>(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+export function logoContrastBackground(screening){
+ const foregroundLuminance=Number(screening?.relativeLuminance);
+ if(!Number.isFinite(foregroundLuminance)||foregroundLuminance<0||foregroundLuminance>1)throw new Error('MISSING_LOGO_CONTRAST_DATA: reacquire the firm logo before assembly.');
+ const whiteContrast=contrastRatio(foregroundLuminance,1),darkContrast=contrastRatio(foregroundLuminance,.005605);
+ const light=whiteContrast>=darkContrast;
+ return {color:light?'#FFFFFF':'#111111',tone:light?'light':'dark',foregroundLuminance:Number(foregroundLuminance.toFixed(4)),contrastRatio:Number(Math.max(whiteContrast,darkContrast).toFixed(2))};
+}
 export function analyzeVisual(action,path){
  return new Promise((resolve,reject)=>{
   const child=spawn(process.env.VISUAL_PYTHON_PATH||'/opt/visual/bin/python',[fileURLToPath(new URL('./visual-analysis.py',import.meta.url)),action,path],{windowsHide:true,shell:false});let out='',err='';

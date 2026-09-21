@@ -1,13 +1,19 @@
 # Article Video Studio — Global Rules
 
-Version 1.4.3 · Updated September 17, 2026
+Version 1.4.4 · Updated September 21, 2026
 
 ## Active sources and workflow
 
-Only the two current documents below govern content and appearance. The retired standalone layout specification is no longer an active source.
+The two current documents below, together with the user-authorized updates in this rulebook, govern content and appearance. The retired standalone layout specification is no longer an active source.
 
 - [Video Content and Script Rules](https://docs.google.com/document/d/1WSvU3_FJYC_tl7hOHpVYM4L_5rhofNLD8X6F8cHyosQ/edit)
 - [Video Appearance and Quality Rules](https://docs.google.com/document/d/1pSiCC_mkD1rieKF08kLFJhIG9NaGoUGPmw_EqhkPDWU/edit)
+
+## Required production workflow — user update September 21, 2026
+
+**Google Doc → Codex CLI writes the script → Keziah approves → HeyGen creates the video presenter and voiceover → Railway assembles the video → Macy reviews → Google Drive**
+
+Keep these stages in this order. Codex CLI is the production script author. Keziah's approval of the exact script is required before any paid HeyGen submission. HeyGen supplies the approved Studio Avatar, matching voiceover, lip-sync, source footage, and caption timing. Railway adds the approved layout, contrast-backed client logo, captions, thumbnail, and end card. Macy reviews the finished assembled video before its MP4, thumbnail, and captions are delivered to the selected Google Drive Visual folder.
 
 User-authorized application settings: select a monthly tab and row manually; article J, Visual folder L, article target URL E. ClickUp and Social Poster triggers remain deferred. Keziah approves the current script; the app selects an approved generic Studio Avatar and voice for each video, then generates with HeyGen. Railway assembles the portrait video and returns it to Macy. Only Macy approval initiates Drive delivery. Existing approvals are not replayed on rules migration. The preferred speaking time is 30 seconds; the white end card lasts three seconds. Brand colors remain deferred; use neutral styling.
 
@@ -2637,7 +2643,7 @@ Correct:
 
 +-------------------------+
 
-Every point in the visible frame must belong to the talking-person scene except pixels occupied by the logo and captions.
+Every point in the visible frame must belong to the talking-person scene except pixels occupied by the logo, its compact contrast background, and captions.
 
 ### V24 STATE A Allowed Visible Elements
 
@@ -2787,7 +2793,19 @@ SVG
 
 Other clean logo-only asset
 
-Do not intentionally place the logo inside a separate white card, banner, panel, or rectangle.
+Every rendered logo must have a compact solid background so the complete mark remains easy to see.
+
+Choose the background automatically from the visible logo pixels:
+
+Dark logo → white background (`#FFFFFF`)
+
+White or light logo → dark background (`#111111`)
+
+For a mixed-color logo, use the light or dark background that produces the greater overall luminance contrast.
+
+Apply consistent padding around the complete logo. Keep this contrast background limited to the logo area; it must not become a full-width header, contact panel, banner, or separate content region.
+
+Use the same selected background in STATE A, the thumbnail, and STATE B.
 
 If the official logo itself contains an intrinsic background shape, that design may remain.
 
@@ -2831,7 +2849,7 @@ Reduce below the preferred range only when necessary to prevent a presenter-face
 
 ### V30 Logo Must Overlay the Scene
 
-During STATE A, the logo must visually sit over actual scene pixels.
+During STATE A, the logo and its compact contrast background must visually sit over actual scene pixels.
 
 Correct:
 
@@ -2845,7 +2863,7 @@ blank blank blank [LOGO]
 
 talking video
 
-Do not create blank upper-right canvas specifically to hold the logo.
+Do not create blank upper-right canvas specifically to hold the logo. The small V28 contrast background is the only permitted logo plate.
 
 ### V31 Logo and Face Collision
 
@@ -4367,7 +4385,7 @@ No blurred sidebar exists
 
 No separate caption band exists
 
-No separate logo/header region exists
+No separate logo/header region exists beyond the compact V28 contrast background
 
 Talking-person environment fills the complete frame
 
@@ -4398,6 +4416,12 @@ Top margin is approximately 3% to 4%
 Width is approximately 32% to 38%
 
 Preferred width is approximately 35%
+
+Dark logo uses a white background
+
+White or light logo uses a dark background
+
+Contrast background is compact, padded, and present in STATE A, thumbnail, and STATE B
 
 Aspect ratio is preserved
 
@@ -5090,6 +5114,10 @@ STATE A logo upper-right
 +
 
 STATE A logo approximately 32% to 38% frame width
+
++
+
+Automatic contrasting logo background
 
 +
 

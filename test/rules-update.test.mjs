@@ -10,12 +10,16 @@ import {Store} from '../src/store.mjs';
 import {reconcileRules} from '../src/rules-migration.mjs';
 import {fixture} from './fixture-data.mjs';
 test('all source sections, Russell-only rules and required logo acquisition survive synchronization',()=>{
-  assert.equal(config.version,'1.4.3');assert.equal(config.workflow.approvalScope,'per_question');assert.equal([...rules.matchAll(/^### C\d{2} /gm)].length,36);
+  assert.equal(config.version,'1.4.4');assert.equal(config.workflow.approvalScope,'per_question');assert.equal([...rules.matchAll(/^### C\d{2} /gm)].length,36);
   assert.equal(config.video.presenterGenderEvidenceSource,'lawyer_blurb_only');assert.equal(config.video.reviewerGenderCorrection,'new_cpu_render_with_same_gender_voice');assert.match(rules,/Only use gender information found in the lawyer blurb/);
   assert.equal([...rules.matchAll(/^#### C32\.\d /gm)].length,7);assert.equal([...rules.matchAll(/^### V\d{2,3} /gm)].length,100);
   assert.match(clientRules('Russell Chicago'),/source|body/i);assert.doesNotMatch(clientRules('Paul'),/Russell Chicago/);
   assert.match(rules,/persistent caching by domain/);
   assert.equal(config.video.logoAcquisition.implementationStatus,'implemented_google_authorization_separate');
+  assert.deepEqual(config.workflow.productionPipeline.orderedStages,['google_doc','codex_cli_script','keziah_script_approval','heygen_presenter_and_voiceover','railway_video_assembly','macy_video_review','google_drive_delivery']);
+  assert.equal(config.workflow.productionPipeline.scriptAuthor,'codex_cli');assert.equal(config.workflow.productionPipeline.videoProvider,'heygen');assert.equal(config.workflow.productionPipeline.assembler,'railway');
+  assert.equal(config.video.logoBackground.required,true);assert.equal(config.video.logoBackground.darkLogoBackground,'#FFFFFF');assert.equal(config.video.logoBackground.lightLogoBackground,'#111111');
+  assert.match(rules,/Google Doc → Codex CLI writes the script → Keziah approves → HeyGen creates the video presenter and voiceover → Railway assembles the video → Macy reviews → Google Drive/);
 });
 test('only Russell Chicago can use substantive body questions and grounded topics',()=>{
   const source={documentId:'test',title:'Article title',body:{content:[
