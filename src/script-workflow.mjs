@@ -28,7 +28,6 @@ export class ScriptWorkflow{
     if(this.active.has(id)||job.status==='analyzing')throw Object.assign(new Error('Script analysis is already running.'),{status:409});
     if(!this.env.OPENAI_API_KEY){job.status=job.plan?'revision_pending':'awaiting_script';job.revisionRequest={feedback,status:'awaiting_manual_update',at:new Date().toISOString()};job.error='OpenAI is not connected. An administrator can prepare or revise this script manually for the test; no automatic rewrite has run.';this.store.save(job);return job;}
     await this.checkFresh(job);if(this.store.get(id).revision!==job.revision)throw Object.assign(new Error('The article changed. Reload before analysis.'),{status:409});
-    const limit=Number(this.env.DAILY_ANALYSIS_LIMIT||10);if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid daily analysis limit.');this.store.consume(limit);
     const previousPlan=job.plan;
     if(job.plan)job.history=[...(job.history||[]),{at:job.updated,plan:job.plan,reviews:job.reviews,origin:job.origin,audit:job.audit,validation:job.validation,revision:job.revision}];
     job.status='analyzing';job.reviews=[];job.questionReviews=[];job.questionAudits={};job.questionRequests={};job.plan=null;job.error=null;job.origin='OpenAI API draft with separate semantic review';job.auditRequired=true;job.revisionRequest={feedback,status:'working',at:new Date().toISOString()};this.store.save(job);this.active.add(id);
@@ -49,7 +48,6 @@ export class ScriptWorkflow{
     if(scoped&&(['analyzing','interrupted'].includes(job.status)||['working','queued'].includes(job.questionRequests?.[index]?.status)))throw Object.assign(new Error('This question or article is already being revised.'),{status:409});
     await this.checkFresh(job,scoped?index:undefined);
     if(this.store.get(id)?.revision!==job.revision)throw Object.assign(new Error('The article changed. Reload before requesting another draft.'),{status:409});
-    const limit=Number(this.env.DAILY_ANALYSIS_LIMIT||10);if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid daily analysis limit.');this.store.consume(limit);
     const provider=this.directResolver.provider();
     if(scoped){
       const state=questionState(job,index);feedback=[...new Set([...state.reviews.filter(r=>r.decision==='reject').map(r=>r.note),feedback].filter(Boolean))].join('\n\n');
@@ -126,7 +124,6 @@ export class ScriptWorkflow{
     job.questionRequests={...(job.questionRequests||{}),[index]:{index,requestId,draftHash:state.draftHash,feedback,status:this.env.OPENAI_API_KEY?'working':'awaiting_manual_update',at:new Date().toISOString()}};
     if(!this.env.OPENAI_API_KEY){updateQuestionStatus(job);this.store.save(job);return job;}
     await this.checkFresh(job);if(this.store.get(id).revision!==job.revision)throw new Error('The article changed. Reload before revising this question.');
-    const limit=Number(this.env.DAILY_ANALYSIS_LIMIT||10);if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid daily analysis limit.');this.store.consume(limit);
     this.store.save(job);this.active.add(key);
     const previousPlan={...job.plan,videos:[job.plan.videos[index]]};
     this.analyzer(job.doc,{...job.client,maxVideos:1},{previousPlan,feedback,onlyQuestion:job.plan.videos[index].question}).then(result=>{

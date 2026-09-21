@@ -44,6 +44,8 @@ Copy the settings from [.env.example](.env.example) into Railway Variables, usin
 - `APP_ORIGIN=https://article-video-studio-production.up.railway.app`
 - `HOST=0.0.0.0` and `DATA_DIR=/data`
 
+Codex script analysis and script rewrites have no application-level daily cap. `DAILY_ANALYSIS_LIMIT` is no longer used and can be removed from Railway Variables. The separate `DAILY_VIDEO_LIMIT` still controls new paid HeyGen submissions.
+
 The Google OAuth account needs access to the pasted Google Docs and each selected Visual folder. New jobs can begin with only the Doc URL; the firm homepage, published article URL, and Visual folder must be added before video generation.
 
 ## Team sign-in

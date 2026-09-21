@@ -25,7 +25,7 @@ function source(identity){
 }
 function appFor(t){
   const dir=mkdtempSync(join(tmpdir(),'follow-up-qa-'));
-  const app=createApp({HOST:'127.0.0.1',PORT:'4199',APP_ORIGIN:'http://127.0.0.1:4199',DATA_DIR:dir,VIDEO_PROVIDER:'liteavatar_worker',AI_PROVIDER:'codex_worker',STUDIO_WORKER_TOKEN:'synthetic-qa-worker-token-only',DAILY_ANALYSIS_LIMIT:'100'});
+  const app=createApp({HOST:'127.0.0.1',PORT:'4199',APP_ORIGIN:'http://127.0.0.1:4199',DATA_DIR:dir,VIDEO_PROVIDER:'liteavatar_worker',AI_PROVIDER:'codex_worker',STUDIO_WORKER_TOKEN:'synthetic-qa-worker-token-only',DAILY_ANALYSIS_LIMIT:'1'});
   app.scripts.checkFresh=async()=>{};app.video.checkFresh=async()=>{};app.video.ensureLogo=async()=>{};
   t.after(()=>{app.video.closed=true;app.store.close();rmSync(dir,{recursive:true,force:true});});
   return app;
@@ -34,7 +34,7 @@ const approve=job=>{recordQuestionReview(job,0,{actor:'QA Reviewer',decision:'ap
 const result=(plan,passed=true)=>({plan:structuredClone(plan),audit:{passed,issues:passed?[]:['Synthetic unresolved source concern.']}});
 const claim=app=>app.tasks.claim({workerId:'qa-worker',types:['ai_codex']});
 
-test('full drafts and scoped rewrites remove repeated openings before saving review hashes',async t=>{
+test('full drafts and scoped rewrites remain unlimited and remove repeated openings before saving review hashes',async t=>{
   const app=appFor(t),job=app.store.create(source('title-once')),plan=structuredClone(job.plan),answer=plan.videos[0].sentences[0].text;
   plan.videos[0].sentences[0].text=plan.videos[0].question+' '+answer;
   for(const index of [undefined,0]){
@@ -68,13 +68,12 @@ test('full redraft invalidates old question audits, but a later scoped repair ca
   assert.doesNotThrow(()=>prepareWorkerVideo(current,0,'liteavatar_worker'));
 });
 
-test('a second in-progress rewrite is rejected without replacing its request or consuming usage',async t=>{
+test('a second in-progress rewrite is rejected without replacing its request',async t=>{
   const app=appFor(t),job=app.store.create(source('overlap'));
   await app.scripts.startDirect(job.id,'First requested correction.',0);
-  const before=app.store.get(job.id),usage=app.store.db.prepare('SELECT count FROM usage').get().count;
+  const before=app.store.get(job.id);
   await assert.rejects(app.scripts.startDirect(job.id,'Second overlapping correction.',0),/already|running|progress/i);
   assert.deepEqual(app.store.get(job.id),before);
-  assert.equal(app.store.db.prepare('SELECT count FROM usage').get().count,usage);
   assert.equal(app.tasks.list(job.id+':question:0').length,1);
 });
 

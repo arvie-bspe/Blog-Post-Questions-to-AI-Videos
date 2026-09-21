@@ -11,7 +11,7 @@ import {createApp} from '../src/server.mjs';
 import {responseJSON} from '../src/ai.mjs';
 test('durable jobs suppress duplicates and interrupted requests require explicit retry',()=>{
   const dir=mkdtempSync(join(tmpdir(),'video-store-'));
-  try{let store=new Store(join(dir,'db'));const j=store.create({identity:'one'});assert.equal(store.create({identity:'one'}).id,j.id);j.status='analyzing';store.save(j);store.consume(1);assert.throws(()=>store.consume(1),/limit/);store.close();store=new Store(join(dir,'db'));assert.equal(store.get(j.id).status,'interrupted');store.close();}finally{rmSync(dir,{recursive:true,force:true});}
+  try{let store=new Store(join(dir,'db'));const j=store.create({identity:'one'});assert.equal(store.create({identity:'one'}).id,j.id);j.status='analyzing';store.save(j);store.close();store=new Store(join(dir,'db'));assert.equal(store.get(j.id).status,'interrupted');store.close();}finally{rmSync(dir,{recursive:true,force:true});}
 });
 test('public hosting requires HTTPS origin and three distinct strong passwords',()=>{
   assert.throws(()=>createSecurity({HOST:'0.0.0.0'}),/HTTPS/);
@@ -33,7 +33,7 @@ test('local pilot inspect, example, review, permissions, failures, and exports',
     const req=httpRequest(root+'/api/'+path,{method:body===undefined?'GET':'POST',headers:{Host:'127.0.0.1:4173',Origin:origin,'Content-Type':'application/json','X-Reviewer':actor}},res=>{let text='';res.on('data',chunk=>text+=chunk);res.on('end',()=>{try{resolve({status:res.statusCode,body:JSON.parse(text)});}catch(e){reject(e);}});});req.on('error',reject);req.end(body===undefined?undefined:JSON.stringify(body));
   });
   try{
-    assert.equal((await request('bootstrap')).status,200);
+    const bootstrap=await request('bootstrap');assert.equal(bootstrap.status,200);assert.equal(bootstrap.body.workflow.analysisDailyLimit,null);assert.equal(bootstrap.body.workflow.dailyLimit,2);
     assert.equal((await request('inspect',{article:'paul'},'Arvie','https://evil.test')).status,403);
     const dispatches=[],enqueue=app.video.automation.enqueue.bind(app.video.automation);app.video.automation.enqueue=(id,actor,index)=>{dispatches.push({id,actor,index});return enqueue(id,actor,index);};
     let {body:job}=await request('inspect',{article:'paul'});assert.ok(job.doc.candidates.length);assert.ok(!job.doc.candidates.some(c=>/need.*lawyer/i.test(c.question)));

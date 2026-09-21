@@ -41,6 +41,5 @@ test('manual HTTP update works without an API key and refuses a duplicate old re
     assert.equal((await request('Macy',body)).status,403);
     const saved=await request('Arvie',body);assert.equal(saved.status,200);assert.equal(saved.body.status,'content_review');
     assert.equal((await request('Arvie',body)).status,409);assert.equal(app.store.get(j.id).history.length,1);
-    assert.equal(app.store.db.prepare('SELECT count(*) AS n FROM usage').get().n,0);
   }finally{await new Promise(r=>app.server.close(r));app.store.close();rmSync(dir,{recursive:true,force:true});}
 });

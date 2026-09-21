@@ -48,11 +48,11 @@ test('a queued Codex draft survives a Railway restart and duplicate retries are 
     const job=store.create({identity:'recover-direct',mode:directMode,status:'inspected',doc:{sourceHash:'source',paragraphs:[]},client:{},row:{},maxVideos:2});
     for(let attempt=1;attempt<=4;attempt++){job.analysisAttempt=attempt;const submitted=resolver.submit(job);job.analysisTaskId=submitted.task.id;}
     job.status='interrupted';job.error='The application restarted during analysis.';job.revisionRequest={status:'working'};store.save(job);
-    const workflow=new ScriptWorkflow({store,env:{AI_PROVIDER:'codex_worker',STUDIO_WORKER_TOKEN:'secret-'.padEnd(32,'x'),DAILY_ANALYSIS_LIMIT:'10'},checkFresh:async()=>assert.fail('A saved pending task must be reused.'),directResolver:resolver});
+    const workflow=new ScriptWorkflow({store,env:{AI_PROVIDER:'codex_worker',STUDIO_WORKER_TOKEN:'secret-'.padEnd(32,'x')},checkFresh:async()=>assert.fail('A saved pending task must be reused.'),directResolver:resolver});
     workflow.recoverPendingTasks();
     let current=store.get(job.id);assert.equal(current.status,'analyzing');assert.equal(current.error,null);
     const tasks=queue.list(job.id+':analysis');assert.equal(tasks.filter(task=>task.status==='queued').length,1);assert.equal(tasks.filter(task=>task.status==='failed').length,3);
-    const before=tasks.length;current=await workflow.startDirect(job.id);assert.equal(current.analysisTaskId,job.analysisTaskId);assert.equal(queue.list(job.id+':analysis').length,before);assert.equal(store.db.prepare('SELECT count(*) n FROM usage').get().n,0);
+    const before=tasks.length;current=await workflow.startDirect(job.id);assert.equal(current.analysisTaskId,job.analysisTaskId);assert.equal(queue.list(job.id+':analysis').length,before);
   }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
 
