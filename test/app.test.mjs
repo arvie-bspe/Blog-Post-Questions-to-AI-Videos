@@ -9,6 +9,7 @@ import {Store} from '../src/store.mjs';
 import {createSecurity} from '../src/security.mjs';
 import {createApp} from '../src/server.mjs';
 import {responseJSON} from '../src/ai.mjs';
+import {directMode,scriptPolicyHash} from '../src/workflow-config.mjs';
 test('durable jobs suppress duplicates and interrupted requests require explicit retry',()=>{
   const dir=mkdtempSync(join(tmpdir(),'video-store-'));
   try{let store=new Store(join(dir,'db'));const j=store.create({identity:'one'});assert.equal(store.create({identity:'one'}).id,j.id);j.status='analyzing';store.save(j);store.close();store=new Store(join(dir,'db'));assert.equal(store.get(j.id).status,'interrupted');store.close();}finally{rmSync(dir,{recursive:true,force:true});}
@@ -41,6 +42,10 @@ test('local pilot inspect, example, review, permissions, failures, and exports',
     assert.equal((await request('inspect',{article:'paul'})).body.id,job.id);
     assert.equal((await request(`jobs/${job.id}/analyze`,{})).status,400);
     job=(await request(`jobs/${job.id}/example`,{})).body;assert.equal(job.plan.videos.length,2);
+    const runtimeJob=app.store.create({...structuredClone(job),identity:'direct-runtime-override',mode:directMode,scriptRulesHash:scriptPolicyHash});
+    assert.equal((await request(`jobs/${runtimeJob.id}/script-runtime`,{expectedRevision:runtimeJob.revision,targetSeconds:60,note:'Juan one-minute script override.'},'Macy')).status,403);
+    const runtimeResponse=await request(`jobs/${runtimeJob.id}/script-runtime`,{expectedRevision:runtimeJob.revision,targetSeconds:60,note:'Juan one-minute script override.'});assert.equal(runtimeResponse.status,200);assert.equal(runtimeResponse.body.scriptTargetSeconds,60);assert.equal(runtimeResponse.body.runtimeOverrides.at(-1).previous,30);
+    assert.equal((await request(`jobs/${runtimeJob.id}/script-runtime`,{expectedRevision:runtimeJob.revision,targetSeconds:30,note:'Stale request must fail.'})).status,409);
     assert.equal((await request(`jobs/${job.id}/example`,{})).status,409);
     assert.equal((await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Source reviewed carefully.'},'Keziah')).status,400);
     const approval=await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Automated QA exercise only. A team member must do the actual source review.',checkedEvidence:true},'Macy');assert.equal(approval.status,200,approval.body.error);job=approval.body;

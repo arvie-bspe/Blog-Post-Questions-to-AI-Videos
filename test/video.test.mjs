@@ -111,7 +111,7 @@ test('HeyGen request binds approved text and public presenter without an image o
     assert.throws(()=>prepareHeyGen(h.parent,hgSettings,null,voice),/library/);
     assert.throws(()=>prepareHeyGen(h.parent,hgSettings,{...avatar,type:'photo_avatar'},voice),/Photo Avatars are disabled/);
     const longer=structuredClone(h.parent);longer.plan.videos[0].sentences=Array(8).fill(longer.plan.videos[0].sentences[0]);approveFixture(longer,0);assert.throws(()=>prepareHeyGen(longer,hgSettings,avatar,voice),/content checks/);
-    longer.plan.videos[0].runtimeReason='Test fixture only. Additional source qualifications require this extra explanation.';approveFixture(longer,0);assert.ok(prepareHeyGen(longer,hgSettings,avatar,voice).renderEstimate>2);
+    longer.plan.videos[0].runtimeReason='Test fixture only. Additional source qualifications require this extra explanation.';longer.scriptTargetSeconds=60;approveFixture(longer,0);const minute=prepareHeyGen(longer,hgSettings,avatar,voice);assert.equal(minute.targetSeconds,60);assert.ok(minute.renderEstimate>2);
   }finally{h.close();}
 });
 

@@ -34,6 +34,16 @@ test('new direct validation is source-grounded without reapplying retired conten
   assert.match(directInstructions(),/previous Video Content and Script Rules document is retired/i);
 });
 
+test('an article-specific 60-second override permits a substantive one-minute direct script',()=>{
+  const doc={sourceHash:'source',questionSelectionMode:'ai_independent',paragraphs:[{id:'p1',style:'NORMAL_TEXT',text:'The article provides detailed filing steps and qualifications for the viewer.'}]};
+  const answer=Array.from({length:138},(_,index)=>index%2?'filing':'details').join(' ')+'.';
+  const plan={videos:[{candidateId:'formulated-long',question:'How does the detailed filing process work?',reason:'The source provides enough detail for a longer viewer explanation.',thumbnailTitle:'Detailed Filing Process',selectionKind:'formulated_source',supportingParagraphIds:['p1'],runtimeReason:'Reviewer-authorized 60-second explanation using additional source-supported context.',sentences:[{text:answer,evidence:[{paragraphId:'p1',quote:'The article provides detailed filing steps and qualifications for the viewer.'}]}],cta:'',disclaimer:'',reviewFlags:[]}],skipped:[]};
+  assert.match(validateDirectPlan(plan,doc,1).errors.join(' '),/90-word development limit/);
+  const sixty=validateDirectPlan(plan,doc,1,60);assert.deepEqual(sixty.errors,[]);assert.ok(sixty.warnings.some(item=>item.includes('approved 60-second runtime override')));
+  const tooShort=structuredClone(plan);tooShort.videos[0].sentences[0].text=Array(80).fill('details').join(' ')+'.';assert.match(validateDirectPlan(tooShort,doc,1,60).errors.join(' '),/135-word minimum/);
+  assert.match(directInstructions({targetSeconds:60}),/135 to 150 total spoken words/);assert.match(directInstructions(),/90 is an absolute development limit/);
+});
+
 test('Codex resolver creates a provider-neutral durable task',()=>{
   const calls=[],tasks={enqueue:value=>{calls.push(value);return {id:'task-1',status:'queued'};}},resolver=new DirectAIResolver({env:{AI_PROVIDER:'codex_worker',STUDIO_WORKER_TOKEN:'x'.repeat(32)},tasks});
   const job={id:'job-1',doc:{sourceHash:'source',paragraphs:[]},client:{},plan:null,maxVideos:2};

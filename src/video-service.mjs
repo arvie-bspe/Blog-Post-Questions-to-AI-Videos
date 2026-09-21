@@ -156,7 +156,7 @@ export class VideoService {
       const probe=await this.media.probe(join(dir,'presenter.mp4'));j.duration=durationOf(probe);j.measuredCostEstimate=estimate(j.avatar.type,j.duration);this.save(j);
       if(!probe.streams.some(s=>s.codec_type==='audio')||!probe.streams.some(s=>s.codec_type==='video')||j.duration>180)
         throw Object.assign(new Error('The HeyGen result has missing media or exceeds this service’s 180-second processing allowance. Review the original; no words were cut or replacement purchased.'),{permanent:true});
-      j.runtimeReview=j.duration>30.25?'Above the preferred 30 seconds: the video reviewer must confirm necessary context, natural pace, and absence of filler.':null;this.save(j);
+      const targetSeconds=j.targetSeconds||30;j.runtimeReview=j.duration>targetSeconds+.25?`Above the approved ${targetSeconds}-second target: the video reviewer must confirm necessary context, natural pace, and absence of filler.`:null;this.save(j);
       if(!result.subtitle_url)throw new Error('HeyGen has not returned caption timing yet. Resume to check the same video.');
       const captionFile=await this.heygen.bytes(result.subtitle_url,1024*1024);
       writeFileSync(join(dir,'provider-captions.srt'),captionFile.body);

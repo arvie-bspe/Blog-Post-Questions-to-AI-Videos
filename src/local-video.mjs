@@ -8,7 +8,7 @@ import {endCardData,layoutVersion,detectorVersion} from './visual-checks.mjs';
 import {matchingPresenter,presenterPool} from './presenter-compatibility.mjs';
 import {durationOf} from './media.mjs';
 import {appearanceRulesHash} from './rules.mjs';
-import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
+import {videoProvider,isWorkerVideoProvider,scriptTargetSeconds} from './workflow-config.mjs';
 
 const now=()=>new Date().toISOString();
 const modes={
@@ -31,9 +31,9 @@ export function prepareWorkerVideo(job,index,provider='local_worker',requestedGe
   if(job.setupIssues?.length)throw new Error(job.setupIssues.join(' '));
   const selected=mode(provider),approvalHash=approved(job,index),video=job.plan.videos[index];if(!video)throw new Error('Choose one approved question.');const {avatar,voice,selection}=workerPresenter(job,index,provider,requestedGender);
   const script=scriptText(video),articleIdentity=requireArticleIdentity(job.doc,job.plan.articleIdentity),endCard={...endCardData({articleIdentity,script,source:{targetUrl:job.row.pageUrl}}),seconds:3};
-  const wordCount=script.trim().split(/\s+/).filter(Boolean).length,title=String(video.thumbnailTitle||video.question.replace(/\?$/,'')).trim().split(/\s+/).slice(0,6).join(' ');
+  const wordCount=script.trim().split(/\s+/).filter(Boolean).length,title=String(video.thumbnailTitle||video.question.replace(/\?$/,'')).trim().split(/\s+/).slice(0,6).join(' '),targetSeconds=scriptTargetSeconds(job);
   const data={provider,layoutVersion,endCard,articleIdentity,parentId:job.id,index,approvalHash,script,scriptHash:hash(script),question:video.question,thumbnailTitle:title,avatar,voice,selection,client:job.client,
-    source:{documentUrl:job.row.documentUrl,sourceHash:job.doc.sourceHash,mode:job.mode,rulesHash:appearanceRulesHash,folderUrl:job.row.folderUrl,targetUrl:job.row.pageUrl},models:selected.models,format:{width:1080,height:1920,aspectRatio:'9:16'},logoRequired:true,outputRevision:1,targetSeconds:30,wordCount,estimatedSeconds:Math.max(1,Math.ceil(wordCount/2.2)),renderEstimate:0,prices:{currency:'USD',providerCharge:0,hosting:'Railway usage'},identity:hash([provider,job.id,index,approvalHash,avatar.id,voice.id,title,layoutVersion,appearanceRulesHash]),status:'prepared',requests:{},files:{},reviews:[]};
+    source:{documentUrl:job.row.documentUrl,sourceHash:job.doc.sourceHash,mode:job.mode,rulesHash:appearanceRulesHash,folderUrl:job.row.folderUrl,targetUrl:job.row.pageUrl},models:selected.models,format:{width:1080,height:1920,aspectRatio:'9:16'},logoRequired:true,outputRevision:1,targetSeconds,wordCount,estimatedSeconds:Math.max(1,Math.ceil(wordCount/2.2)),renderEstimate:0,prices:{currency:'USD',providerCharge:0,hosting:'Railway usage'},identity:hash([provider,job.id,index,approvalHash,avatar.id,voice.id,title,targetSeconds,layoutVersion,appearanceRulesHash]),status:'prepared',requests:{},files:{},reviews:[]};
   return {...data,id:randomUUID(),created:now(),createdBy:'system'};
 }
 
@@ -57,7 +57,7 @@ async function finishWorkerSetup(service,data,parent,actor){
 }
 
 async function enqueueWorkerRecord(service,data,parent,actor){
-  const selected=mode(data.provider),payload={context:{videoId:data.id,parentId:parent.id,index:data.index,sourceHash:parent.doc.sourceHash,approvalHash:data.approvalHash},script:data.script,question:data.question,voice:data.voice,target:{seconds:30,aspectRatio:'9:16'},engines:selected.engines};
+  const selected=mode(data.provider),payload={context:{videoId:data.id,parentId:parent.id,index:data.index,sourceHash:parent.doc.sourceHash,approvalHash:data.approvalHash},script:data.script,question:data.question,voice:data.voice,target:{seconds:data.targetSeconds||30,aspectRatio:'9:16'},engines:selected.engines};
   if(data.provider==='local_worker')payload.presenterAsset=data.avatar.asset;else payload.profileKey=data.avatar.profileKey;
   const task=service.tasks.enqueue({type:selected.taskType,subject:data.id,payload,priority:20,idempotencyKey:hash([selected.taskType,data.id,data.approvalHash,data.renderAttempt||1])});
   data.workerTaskId=task.id;data.status='working';data.stage=selected.stage;data.requests[selected.requestKey]={id:task.id,state:'queued'};service.save(data);service.store.record(parent.id,actor,data.provider==='liteavatar_worker'?'queue_liteavatar_cpu_video':'queue_local_talking_video');return data;

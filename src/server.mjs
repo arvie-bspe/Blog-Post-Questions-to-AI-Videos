@@ -19,16 +19,16 @@ import {importSavedReviews} from './saved-reviews.mjs';
 import {resolveArticleIdentity} from './article-identity.mjs';
 import {approved} from './video-domain.mjs';
 import {adoptSourceIdentity} from './source-records.mjs';
-import {questionState,questionHash,recordQuestionReview,assertSourceAudit} from './question-approval.mjs';
+import {questionState,questionHash,recordQuestionReview,assertSourceAudit,updateQuestionStatus} from './question-approval.mjs';
 import {presenterIssue} from './presenter-compatibility.mjs';
 import {TaskQueue} from './task-queue.mjs';
 import {DirectAIResolver} from './direct-ai.mjs';
-import {directMode,directSetupIssues,scriptPolicyHash,scriptPolicyVersion,workflowVersion,aiProvider,videoProvider,isWorkerVideoProvider,workerConfigured} from './workflow-config.mjs';
+import {directMode,directSetupIssues,scriptPolicyHash,scriptPolicyVersion,workflowVersion,aiProvider,videoProvider,isWorkerVideoProvider,workerConfigured,scriptTargetSeconds} from './workflow-config.mjs';
 import {workflowStep} from './workflow-step.mjs';
 import {syntheticFixture} from './synthetic-fixtures.mjs';
 const file=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
-const brief=j=>({id:j.id,status:j.status,title:j.doc.pageTitle,client:j.client.key,mode:j.mode,origin:j.origin||null,updated:j.updated,videoCount:j.plan?.videos.length||0,workerTasks:j.workerTasks||[]});
+const brief=j=>({id:j.id,status:j.status,title:j.doc.pageTitle,client:j.client.key,mode:j.mode,origin:j.origin||null,updated:j.updated,videoCount:j.plan?.videos.length||0,scriptTargetSeconds:scriptTargetSeconds(j),workerTasks:j.workerTasks||[]});
 export function isCurrentVideo(video,parent,provider){
   try{const expected=isWorkerVideoProvider(video.provider)||parent.mode===directMode?appearanceRulesHash:rulesHash,active=['prepared','working','compositing','visual_review','delivery_pending','delivered','revision_pending','paused','needs_attention','needs_reconciliation','failed'].includes(video.status);return active&&video.provider===provider&&!presenterIssue(video.avatar,video.voice)&&(!video.files?.video||video.detectorVersion===config.video.faceDetectorVersion)&&video.layoutVersion===config.video.layoutVersion&&video.source?.rulesHash===expected&&video.approvalHash===approved(parent,video.index);}catch{return false;}
 }
@@ -149,7 +149,7 @@ export function createApp(env=process.env){
         }
         return send(res,200,job);
       }
-      const match=path.match(/^\/api\/jobs\/([a-f0-9-]+)(?:\/(example|analyze|review|manual-revision|refresh-source|setup|verify-task|export))?$/);
+      const match=path.match(/^\/api\/jobs\/([a-f0-9-]+)(?:\/(example|analyze|review|manual-revision|refresh-source|setup|script-runtime|verify-task|export))?$/);
       if(match){
         let job=load(match[1]);const action=match[2];
         if(job.supersededBy){if(req.method==='GET')job=load(job.supersededBy);else fail('This empty inspection is linked to the article with its review history. Open the current article from All articles.',409);}
@@ -167,7 +167,7 @@ export function createApp(env=process.env){
           if(source.row.documentId!==job.row.documentId||source.client.key!==job.client.key)fail('This row now points to a different article or client. Inspect it as a new article.',409);
           job.history=[...(job.history||[]),{at:job.updated,doc:job.doc,row:job.row,client:job.client,plan:job.plan,reviews:job.reviews,revision:job.revision,rulesHash:job.rulesHash,reason:'Source refreshed from Google.'}];
           Object.assign(job,source,{mode:job.mode===directMode?directMode:'live_google',rulesHash,appearanceRulesHash:job.mode===directMode?appearanceRulesHash:undefined,rulesVersion:job.mode===directMode?workflowVersion:config.version,reviews:[],questionReviews:[],questionRequests:{},questionAudits:{},setupIssues:job.mode===directMode?directSetupIssues(source.row,source.client):[...source.row.issues],status:job.plan?'content_review':'inspected',error:null});
-          if(job.plan)job.validation=validateForJob(job.plan,job.doc,job.client);
+          if(job.plan)job.validation=validateForJob(job.plan,job.doc,job.client,4,scriptTargetSeconds(job));
           const identity=job.mode===directMode?hash([directMode,job.row.documentId,job.row.tabId,job.doc.sourceHash,scriptPolicyHash]):recordIdentity(job.row,job.doc,job.mode,rulesHash,job.client);
           store.db.exec('BEGIN IMMEDIATE');try{adoptSourceIdentity(store,job,identity,id=>video.list(id).length>0);store.save(job);store.record(job.id,actor,'refresh_live_source');store.db.exec('COMMIT');}catch(e){store.db.exec('ROLLBACK');throw e;}return send(res,200,job);
         }
@@ -178,6 +178,14 @@ export function createApp(env=process.env){
           if(job.row.pageUrl){let target;try{target=new URL(job.row.pageUrl);}catch{fail('Use a valid published article URL.');}if(!['http:','https:'].includes(target.protocol))fail('Use an HTTP or HTTPS published article URL.');}
           for(const [key,value]of Object.entries({key:body.clientKey,homepage:body.homepage,name:body.firmName,address:body.address,phone:body.phone}))if(value!==undefined&&String(value).trim())job.client[key]=String(value).trim();
           job.row.clientKey=job.client.key;job.row.folderId=googleId(job.row.folderUrl,'folder');job.setupIssues=directSetupIssues(job.row,job.client);store.record(job.id,actor,'update_direct_output_setup');return send(res,200,store.save(job));
+        }
+        if(action==='script-runtime'){
+          if(account.role!=='admin')fail('An admin manages article-specific script runtime overrides.',403);
+          if(job.mode!==directMode)fail('Article-specific runtime overrides apply only to direct Google Doc jobs.',409);
+          const body=await json(req);if(body.expectedRevision!==job.revision)fail('The record changed. Reload before changing its script runtime.',409);
+          const targetSeconds=Number(body.targetSeconds);if(![30,60].includes(targetSeconds))fail('Choose a 30-second target or the approved 60-second override.');
+          const previous=scriptTargetSeconds(job);job.scriptTargetSeconds=targetSeconds;job.runtimeOverrides=[...(job.runtimeOverrides||[]),{actor,at:new Date().toISOString(),previous,targetSeconds,note:String(body.note||'').trim()}];
+          if(job.plan)job.validation=validateForJob(job.plan,job.doc,job.client,4,targetSeconds);job.error=null;updateQuestionStatus(job);store.record(job.id,actor,'set_script_runtime_'+targetSeconds);return send(res,200,store.save(job));
         }
         if(action==='manual-revision'){
           if(account.role!=='admin')fail('An admin manages historical manual draft updates.',403);

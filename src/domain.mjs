@@ -200,7 +200,7 @@ export function validatePlan(plan,doc,client,max=4){
   }
   return {errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
 }
-export function validateDirectPlan(plan,doc,max=4){
+export function validateDirectPlan(plan,doc,max=4,targetSeconds=30){
   const errors=[],warnings=[];
   if(!Array.isArray(plan?.videos)||!Array.isArray(plan?.skipped))return {errors:['Invalid analysis format.'],warnings};
   if(plan.videos.length>max)errors.push(`Video count exceeds the configured maximum of ${max}.`);
@@ -223,12 +223,17 @@ export function validateDirectPlan(plan,doc,max=4){
     }
     if(v.cta||v.disclaimer)warnings.push(`${id}: review the optional closing wording against the source and client instructions.`);
     const script=[question,...v.sentences.map(s=>s.text),v.cta,v.disclaimer].filter(Boolean).join(' '),words=script.trim().split(/\s+/).filter(Boolean).length;
-    if(words>90)errors.push(`${id}: the script exceeds the 90-word development limit.`);else if(words>75)warnings.push(`${id}: the script is above the preferred approximately 30-second range.`);
+    if(targetSeconds===60){
+      if(words>165)errors.push(`${id}: the script exceeds the 165-word limit for the approved 60-second override.`);
+      else if(words<135)errors.push(`${id}: the script is below the 135-word minimum for the approved 60-second override.`);
+      if(typeof v.runtimeReason!=='string'||v.runtimeReason.trim().length<20)errors.push(`${id}: the 60-second override needs a specific runtime reason.`);
+      else warnings.push(`${id}: review the approved 60-second runtime override: ${v.runtimeReason}`);
+    }else if(words>90)errors.push(`${id}: the script exceeds the 90-word development limit.`);else if(words>75)warnings.push(`${id}: the script is above the preferred approximately 30-second range.`);
     const signature=normalize(v.sentences.map(s=>s?.text).join(' '));if(answers.has(signature))errors.push(`${id}: duplicate answer.`);answers.add(signature);
     if(Array.isArray(v.reviewFlags))warnings.push(...v.reviewFlags.map(f=>`${id}: ${f}`));
   }
   return {errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
 }
-export const validateForJob=(plan,doc,client,max=4)=>doc?.questionSelectionMode==='ai_independent'?validateDirectPlan(plan,doc,max):validatePlan(plan,doc,client,max);
+export const validateForJob=(plan,doc,client,max=4,targetSeconds=30)=>doc?.questionSelectionMode==='ai_independent'?validateDirectPlan(plan,doc,max,targetSeconds):validatePlan(plan,doc,client,max);
 export const identity=(row,doc,mode,rulesHash)=>hash([mode,normalize(row.clientKey),row.documentId,doc.sourceHash,rulesHash]);
 export const recordIdentity=(row,doc,mode,rulesHash,client)=>hash([identity(row,doc,mode,rulesHash),hash(client),row.order,row.folderId]);

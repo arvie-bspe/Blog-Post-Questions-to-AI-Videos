@@ -56,6 +56,8 @@ For the initial email-only migration, set the three team email variables before 
 
 The question is narrated once before the answer. New AI drafts remove exact repeated opening headings before review; validation blocks any remaining repetition from approval or rendering. Existing saved scripts are not silently rewritten: use **Request changes** on a flagged script and approve the corrected wording.
 
+Scripts default to approximately 30 seconds. An administrator can apply a 60-second override to one direct-document article without changing other jobs. The override requires 135–165 source-grounded spoken words, invalidates earlier script approvals for that article, and still requires Keziah to review each revised script. It does not increase the authorized HeyGen spending allowance.
+
 ## Private worker
 
 The worker uses outbound HTTPS only. Copy [worker/worker.env.example](worker/worker.env.example) to `.env.worker`, set the same `STUDIO_WORKER_TOKEN` used by Railway, and run:
