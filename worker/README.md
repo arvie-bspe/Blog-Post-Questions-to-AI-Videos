@@ -1,6 +1,6 @@
 # Private local worker
 
-This worker connects outward to Railway. On Windows it runs Codex CLI with the current user's saved login and can finish legacy SadTalker tasks. A separate Railway service runs new LiteAvatar CPU tasks. Neither worker opens an inbound port.
+This worker connects outward to Railway and runs Codex CLI with the current Windows user's saved login for article analysis and script revisions. It opens no inbound port. Production video generation uses HeyGen and does not run Kokoro, LiteAvatar, or SadTalker workers.
 
 Required environment variables:
 
@@ -8,17 +8,7 @@ Required environment variables:
 - `STUDIO_WORKER_TOKEN`: the same random private value configured in Railway.
 - `CODEX_BIN`: optional Codex executable path.
 - `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, and `NODE_EXTRA_CA_CERTS`: optional organization CA bundle paths when the worker's HTTPS connections require them.
-- `LOCAL_MEDIA_PYTHON`: optional Python executable for the isolated media environment.
-- `KOKORO_MODEL`: full path to the official `kokoro-v1.0.onnx` model.
-- `KOKORO_VOICES`: full path to the official `voices-v1.0.bin` file.
-- `SADTALKER_DIR`: local SadTalker checkout containing downloaded checkpoints.
-- `SADTALKER_PYTHON`: Python executable in SadTalker's separate pinned environment.
-- `LOCAL_MEDIA_DEVICE`: `cpu` is the safe default for the current 2 GB GPU; use another value only after a successful benchmark.
-- `MEDIA_RENDER_TIMEOUT_MS`: optional local render timeout. The default is six hours because CPU-only talking-video generation is slow.
-- `FFMPEG_PATH`: optional full path to `ffmpeg.exe`; the repository-local Windows binary is detected when present.
 
-Use two isolated Python environments because current Kokoro ONNX and SadTalker's older pinned NumPy stack conflict. `LOCAL_MEDIA_PYTHON` runs this orchestrator with `media-requirements.txt`; `SADTALKER_PYTHON` runs SadTalker's `inference.py`. Kokoro's duration output supplies caption timing without a second speech-recognition model. Review and pin the exact model assets and licenses before production.
+Set `STUDIO_WORKER_TYPES=ai_codex` so the worker claims reasoning tasks only. Historical local-media environment variables may still appear in old private configuration files, but the current production workflow does not use them.
 
 Start the worker from this repository with `npm run worker`. The command enables Node's operating-system CA store for managed networks. Keep the computer awake and signed in. Stop it with Ctrl+C.
-
-For the Railway CPU service, use `Dockerfile.liteavatar`, set `STUDIO_WORKER_TYPES=media_liteavatar`, and reuse the web app's private worker token. The Docker image supplies `LITEAVATAR_PYTHON`, `LITEAVATAR_DIR`, `LITEAVATAR_PROFILES_DIR`, the CPU-compatible Kokoro FP32 model, and its voices. The service needs no Codex login and no public domain.
