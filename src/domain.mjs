@@ -1,4 +1,5 @@
 import {resolveArticleIdentity} from './article-identity.mjs';
+import {repeatsScriptHeading} from './script-content.mjs';
 import {createHash} from 'node:crypto';
 export const normalize=s=>String(s??'').normalize('NFKC').replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim().toLowerCase();
 export const hash=v=>createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
@@ -170,6 +171,7 @@ export function validatePlan(plan,doc,client,max=4){
     }
     if(ids.has(id)||questions.has(normalize(v.question)))errors.push(`${id}: duplicate question.`);ids.add(id);questions.add(normalize(v.question));
     if(!Array.isArray(v.sentences)||!v.sentences.length){errors.push(`${id}: empty answer.`);continue;}
+    if(repeatsScriptHeading(v))errors.push(`${id}: the script repeats its title/question. Keep the title once and start the answer directly.`);
     for(const s of v.sentences){
       if(typeof s?.text!=='string'||!s.text.trim()||!Array.isArray(s.evidence)||!s.evidence.length){errors.push(`${id}: each sentence needs source evidence.`);continue;}
       for(const e of s.evidence){
@@ -214,6 +216,7 @@ export function validateDirectPlan(plan,doc,max=4){
     if(!support.length||support.some(pid=>!paragraphs.has(pid)))errors.push(`${id}: identify supporting article paragraphs for this question.`);
     if(typeof v.reason!=='string'||v.reason.trim().length<12)errors.push(`${id}: explain briefly why this question is useful for video.`);
     if(!Array.isArray(v.sentences)||!v.sentences.length){errors.push(`${id}: empty answer.`);continue;}
+    if(repeatsScriptHeading(v))errors.push(`${id}: the script repeats its title/question. Keep the title once and start the answer directly.`);
     for(const sentence of v.sentences){
       if(typeof sentence?.text!=='string'||!sentence.text.trim()||!Array.isArray(sentence.evidence)||!sentence.evidence.length){errors.push(`${id}: each sentence needs article evidence.`);continue;}
       for(const evidence of sentence.evidence){const p=paragraphs.get(evidence?.paragraphId);if(!p||typeof evidence.quote!=='string'||evidence.quote.trim().length<8||!p.text.includes(evidence.quote))errors.push(`${id}: evidence does not match the selected Google Doc tab.`);}

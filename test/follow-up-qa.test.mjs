@@ -10,6 +10,7 @@ import {presenterGender,permittedPresenterGender} from '../src/article-identity.
 import {directMode,scriptPolicyHash} from '../src/workflow-config.mjs';
 import {appearanceRulesHash,rulesHash,config} from '../src/rules.mjs';
 import {mountVideo} from '../public/video-ui.js';
+import {scriptText} from '../src/video-domain.mjs';
 
 function source(identity){
   const doc={sourceHash:'qa-source',questionSelectionMode:'ai_independent',paragraphs:[
@@ -32,6 +33,20 @@ function appFor(t){
 const approve=job=>{recordQuestionReview(job,0,{actor:'QA Reviewer',decision:'approve',note:'Synthetic source evidence checked.',at:new Date().toISOString()});return job;};
 const result=(plan,passed=true)=>({plan:structuredClone(plan),audit:{passed,issues:passed?[]:['Synthetic unresolved source concern.']}});
 const claim=app=>app.tasks.claim({workerId:'qa-worker',types:['ai_codex']});
+
+test('full drafts and scoped rewrites remove repeated openings before saving review hashes',async t=>{
+  const app=appFor(t),job=app.store.create(source('title-once')),plan=structuredClone(job.plan),answer=plan.videos[0].sentences[0].text;
+  plan.videos[0].sentences[0].text=plan.videos[0].question+' '+answer;
+  for(const index of [undefined,0]){
+    await app.scripts.startDirect(job.id,'Keep the title once and preserve the answer.',index);
+    const task=claim(app);await app.tasks.complete(task.id,task.leaseToken,result(plan));
+    const current=app.store.get(job.id);assert.equal(current.plan.videos[0].sentences[0].text,answer);
+    assert.equal(current.questionReviews?.some(review=>review.draftHash===questionHash(current,0)),false);
+    if(index===0)assert.equal(current.questionAudits[0].draftHash,questionHash(current,0));
+    assert.doesNotThrow(()=>approvedQuestion(approve(current),0));
+    assert.equal(scriptText(current.plan.videos[0]),plan.videos[0].question+'\n\n'+answer);
+  }
+});
 
 test('full redraft invalidates old question audits, but a later scoped repair can approve',async t=>{
   const app=appFor(t),job=app.store.create(source('stale-audit')),plan=structuredClone(job.plan);

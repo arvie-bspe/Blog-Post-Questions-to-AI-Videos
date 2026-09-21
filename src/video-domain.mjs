@@ -1,4 +1,5 @@
 import {approvedQuestion as approved} from './question-approval.mjs';
+import {repeatsScriptHeading} from './script-content.mjs';
 import {hash,validatePlan} from './domain.mjs';
 import {rulesHash} from './rules.mjs';
 
@@ -6,7 +7,7 @@ export const voices=[{id:'am_michael',name:'Michael · US English · male'},{id:
 export const models={speech:'fal-ai/kokoro/american-english',alignment:'fal-ai/elevenlabs/forced-alignment',video:'veed/fabric-1.0'};
 export const prices={checked:'2026-09-14',speechPerThousandCharacters:0.02,alignmentPerStartedHour:0.22,videoPerSecond:0.15,currency:'USD'};
 export const presenterId='studio-presenter-01';
-export const scriptText=v=>[v.question,...v.sentences.map(s=>s.text),v.cta,v.disclaimer].filter(Boolean).join('\n\n');
+export const scriptText=v=>{if(repeatsScriptHeading(v))throw new Error('The script repeats its title/question. Revise and approve the corrected script before rendering.');return [v.question,...v.sentences.map(s=>s.text),v.cta,v.disclaimer].filter(Boolean).join('\n\n');};
 export {approvedQuestion as approved} from "./question-approval.mjs";
 export function prepare(job,body,assetHash){
   const index=body.index,approvalHash=approved(job,index),video=job.plan.videos[index];
