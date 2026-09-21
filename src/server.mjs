@@ -95,7 +95,7 @@ export function createApp(env=process.env){
       if(req.method==='GET'&&['/','/app.js','/video-ui.js','/styles.css'].includes(path))return send(res,200,file('../public/'+(path==='/'?'index.html':path.slice(1))),path==='/'?'text/html; charset=utf-8':path.endsWith('.js')?'text/javascript; charset=utf-8':'text/css; charset=utf-8');
       if(req.method==='GET'&&path==='/api/session'){const account=security.account(req);return send(res,200,{local:security.local,actor:account?.name||null,account});}
       if(req.method==='POST'&&path==='/api/login'){
-        const body=await json(req),token=security.login(body.identifier||body.email||body.role,body.password,req.socket.remoteAddress),account=security.accounts.session(token);
+        const body=await json(req),token=security.login(body.email||body.identifier,body.password,req.socket.remoteAddress),account=security.accounts.session(token);
         res.setHeader('Set-Cookie',security.cookie(token));return send(res,200,{ok:true,account});
       }
       if(req.method==='POST'&&path==='/api/logout'){security.logout(req);res.setHeader('Set-Cookie',security.cookie(''));return send(res,200,{ok:true});}
@@ -110,9 +110,10 @@ export function createApp(env=process.env){
       }
       if(req.method==='GET'&&path==='/api/accounts'){security.requireAdmin(req);return send(res,200,security.accounts.list());}
       if(req.method==='POST'&&path==='/api/accounts'){security.requireAdmin(req);return send(res,201,security.accounts.create(await json(req),account.id));}
-      const accountAction=path.match(/^\/api\/accounts\/([a-f0-9-]+)\/(reset-password|role)$/);
+      const accountAction=path.match(/^\/api\/accounts\/([a-f0-9-]+)\/(reset-password|role|email)$/);
       if(accountAction&&req.method==='POST'){
         security.requireAdmin(req);const body=await json(req),target=accountAction[1],action=accountAction[2];
+        if(action==='email')return send(res,200,security.accounts.setEmail(target,body.email,account.id));
         if(action==='reset-password'){if(body.newPassword!==body.confirmPassword)fail('New password and confirmation do not match.');security.accounts.resetPassword(target,body.newPassword,account.id);return send(res,200,{ok:true});}
         return send(res,200,security.accounts.setRole(target,body.role,account.id));
       }

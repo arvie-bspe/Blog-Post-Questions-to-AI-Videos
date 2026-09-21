@@ -16,8 +16,8 @@ test('durable jobs suppress duplicates and interrupted requests require explicit
 test('public hosting requires HTTPS origin and three distinct strong passwords',()=>{
   assert.throws(()=>createSecurity({HOST:'0.0.0.0'}),/HTTPS/);
   assert.throws(()=>createSecurity({HOST:'0.0.0.0',APP_ORIGIN:'https://studio.test'}),/passwords/);
-  const s=createSecurity({HOST:'0.0.0.0',APP_ORIGIN:'https://studio.test',ARVIE_PASSWORD:'arvie-long-test-password',KEZIAH_PASSWORD:'keziah-long-test-password',MACY_PASSWORD:'macy-long-test-password'});
-  assert.equal(s.actor({headers:{}}),null);const token=s.login('Keziah','keziah-long-test-password','test');assert.equal(s.actor({headers:{cookie:'studio_session='+token}}),'Keziah');assert.match(s.cookie(token),/HttpOnly/);assert.match(s.cookie(token),/Secure/);
+  const s=createSecurity({HOST:'0.0.0.0',APP_ORIGIN:'https://studio.test',KEZIAH_EMAIL:'keziah@example.com',ARVIE_PASSWORD:'arvie-long-test-password',KEZIAH_PASSWORD:'keziah-long-test-password',MACY_PASSWORD:'macy-long-test-password'});
+  assert.equal(s.actor({headers:{}}),null);const token=s.login('keziah@example.com','keziah-long-test-password','test');assert.equal(s.actor({headers:{cookie:'studio_session='+token}}),'Keziah');assert.match(s.cookie(token),/HttpOnly/);assert.match(s.cookie(token),/Secure/);
 });
 test('API rejects incomplete/refused output without accepting a draft',async()=>{
   const old=process.env.OPENAI_API_KEY;process.env.OPENAI_API_KEY='mock-only';

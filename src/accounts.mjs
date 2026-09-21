@@ -3,6 +3,7 @@ import {randomBytes,randomUUID,scryptSync,timingSafeEqual,createHash} from 'node
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 const normalize=value=>String(value||'').trim().toLowerCase();
+const validEmail=value=>{const email=normalize(value);if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)fail('Enter a valid email address.');return email;};
 const publicAccount=row=>row?({id:row.id,name:row.name,email:row.email||'',login:row.login,role:row.role,slackId:row.slack_id||'',active:Boolean(row.active),createdAt:row.created_at,updatedAt:row.updated_at}):null;
 const passwordParts=password=>{const salt=randomBytes(16),hash=scryptSync(String(password),salt,32);return {salt:salt.toString('base64'),hash:hash.toString('base64')};};
 const validPassword=password=>{password=String(password||'');if(password.length<12||password.length>256)fail('Passwords must be 12 to 256 characters long.');return password;};
@@ -49,9 +50,12 @@ export class AccountStore{
       {name:'Macy',role:'member',password:this.env.MACY_PASSWORD,email:this.env.MACY_EMAIL}
     ];
     for(const seed of seeds){
-      if(this.db.prepare('SELECT id FROM accounts WHERE lower(login)=? OR lower(name)=?').get(normalize(seed.name),normalize(seed.name)))continue;
+      const existing=this.db.prepare('SELECT * FROM accounts WHERE lower(login)=? OR lower(name)=?').get(normalize(seed.name),normalize(seed.name));
+      // Backfill only missing emails. Keep saved passwords, roles, IDs and sessions.
+      if(existing){if(!existing.email&&seed.email)this.setEmail(existing.id,seed.email,null);continue;}
+      const email=seed.email?validEmail(seed.email):null;
       const password=seed.password||randomBytes(32).toString('base64url'),parts=passwordParts(password),at=now();
-      this.db.prepare('INSERT INTO accounts(id,name,email,login,role,slack_id,password_salt,password_hash,session_version,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,1,?,?)').run(randomUUID(),seed.name,normalize(seed.email)||null,normalize(seed.name),seed.role,null,parts.salt,parts.hash,at,at);
+      this.db.prepare('INSERT INTO accounts(id,name,email,login,role,slack_id,password_salt,password_hash,session_version,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,1,?,?)').run(randomUUID(),seed.name,email,email||normalize(seed.name),seed.role,null,parts.salt,parts.hash,at,at);
     }
   }
   count(){return Number(this.db.prepare('SELECT count(*) n FROM accounts WHERE active=1').get().n);}
@@ -64,17 +68,22 @@ export class AccountStore{
   }
   find(identifier){const value=normalize(identifier);if(!value)return null;const rows=this.db.prepare('SELECT * FROM accounts WHERE active=1 AND (lower(login)=? OR lower(email)=? OR lower(name)=?)').all(value,value,value),unique=[...new Map(rows.map(row=>[row.id,row])).values()];return unique.length===1?unique[0]:null;}
   verify(row,password){if(!row)return false;const expected=Buffer.from(row.password_hash,'base64'),actual=scryptSync(String(password||''),Buffer.from(row.password_salt,'base64'),expected.length);return expected.length===actual.length&&timingSafeEqual(expected,actual);}
-  authenticate(identifier,password){const row=this.find(identifier);return this.verify(row,password)?publicAccount(row):null;}
+  authenticate(email,password){const value=normalize(email);if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)||value.length>254)return null;const row=this.db.prepare('SELECT * FROM accounts WHERE active=1 AND lower(email)=?').get(value);return this.verify(row,password)?publicAccount(row):null;}
   create(input,actorId){
-    const name=String(input.name||'').trim(),email=normalize(input.email),role=String(input.role||'member'),slackId=String(input.slackId||'').trim(),password=validPassword(input.password);
+    const name=String(input.name||'').trim(),email=validEmail(input.email),role=String(input.role||'member'),slackId=String(input.slackId||'').trim(),password=validPassword(input.password);
     if(!['admin','member'].includes(role))fail('Choose admin or member.');
     if(name.length<2||name.length>80)fail('Enter a name between 2 and 80 characters.');
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)fail('Enter a valid email address.');
     if(slackId.length>64)fail('Slack member IDs must be 64 characters or fewer.');
     if(this.conflicts([name,email]).length)fail('That name or email conflicts with an existing sign-in identifier.',409);
     const parts=passwordParts(password),id=randomUUID(),at=now();
     try{this.db.prepare('INSERT INTO accounts(id,name,email,login,role,slack_id,password_salt,password_hash,session_version,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,1,?,?)').run(id,name,email,email,role,slackId||null,parts.salt,parts.hash,at,at);}catch(error){if(/UNIQUE/i.test(error.message))fail('That name or email already belongs to an account.',409);throw error;}
     this.event(actorId,id,'create_account');return this.get(id);
+  }
+  setEmail(id,value,actorId){
+    const email=validEmail(value);if(!this.row(id))fail('Account not found.',404);
+    if(this.conflicts([email],id).length)fail('That email already belongs to an account.',409);
+    try{this.db.prepare('UPDATE accounts SET email=?,login=?,updated_at=? WHERE id=?').run(email,email,now(),id);}catch(error){if(/UNIQUE/i.test(error.message))fail('That email already belongs to an account.',409);throw error;}
+    this.event(actorId,id,'change_email');return this.get(id);
   }
   updateProfile(id,input,actorId=id){const slackId=String(input.slackId||'').trim();if(slackId.length>64)fail('Slack member IDs must be 64 characters or fewer.');if(!this.row(id))fail('Account not found.',404);this.db.prepare('UPDATE accounts SET slack_id=?,updated_at=? WHERE id=?').run(slackId||null,now(),id);this.event(actorId,id,'update_profile');return this.get(id);}
   changePassword(id,currentPassword,newPassword){const row=this.row(id);if(!row)fail('Account not found.',404);if(!this.verify(row,currentPassword))fail('Current password is incorrect.',401);this.setPassword(id,newPassword,id,'change_own_password');}

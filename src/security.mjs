@@ -27,7 +27,7 @@ export function createSecurity(env,db){
     login(identifier,password,ip){
       const current=Date.now();for(const [key,value]of attempts)if(current-value.at>600000)attempts.delete(key);
       const attempt=attempts.get(ip)||{at:current,count:0};attempt.count++;attempts.set(ip,attempt);if(attempt.count>15)fail('Too many login attempts. Try again in ten minutes.',429);
-      const user=accounts.authenticate(identifier,password);if(!user)fail('Email, account name, or password is incorrect.',401);
+      const user=accounts.authenticate(identifier,password);if(!user)fail('Email or password is incorrect.',401);
       attempts.delete(ip);return accounts.createSession(user.id);
     },
     account,

@@ -38,10 +38,19 @@ Copy the settings from [.env.example](.env.example) into Railway Variables, usin
 - `TTS_PROVIDER=local_kokoro`
 - `STUDIO_WORKER_TOKEN` with a random value of at least 24 characters
 - the existing Google OAuth values and three team passwords
+- `ARVIE_EMAIL`, `KEZIAH_EMAIL`, and `MACY_EMAIL` for the existing team accounts
 - `APP_ORIGIN=https://article-video-studio-production.up.railway.app`
 - `HOST=0.0.0.0` and `DATA_DIR=/data`
 
 The Google OAuth account needs access to the pasted Google Docs and each selected Visual folder. New jobs can begin with only the Doc URL; the firm homepage, published article URL, and Visual folder must be added before video generation.
+
+## Team sign-in
+
+Sign in with the email saved on your account and your existing password. Names remain display names for reviews and are not accepted as login identifiers. Admins can manage sign-in emails under **Accounts → Manage**.
+
+For the initial email-only migration, set the three team email variables before deploying. Startup fills only missing emails; it keeps account IDs, passwords, roles, sessions, and review history. Later restarts do not overwrite emails edited inside the studio.
+
+The question is narrated once before the answer. New AI drafts remove exact repeated opening headings before review; validation blocks any remaining repetition from approval or rendering. Existing saved scripts are not silently rewritten: use **Request changes** on a flagged script and approve the corrected wording.
 
 ## Private worker
 
