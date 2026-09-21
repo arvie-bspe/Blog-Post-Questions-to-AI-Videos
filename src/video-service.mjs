@@ -200,6 +200,8 @@ export class VideoService {
       if(body.action==='resume'){
         const state=this.automation.view(automation[1]),run=state.runs.find(r=>r.id===body.runId);if(!run||run.status!=='blocked')error('Choose the blocked question approval to continue.');
         queueMicrotask(()=>this.automation.run(run));send(res,202,state);
+      }else if(body.action==='start-approved'){
+        this.automation.startMissing(automation[1],actor,Number(body.index));send(res,202,this.automation.view(automation[1]));
       }else {if(account?.role!=='admin')error('An admin account is required to change automatic video settings.',403);send(res,200,this.automation.configure(automation[1],body,actor));}
     }else error('Unsupported request.',405);return true;}
     if(path==='/api/video-config'&&req.method==='GET'){send(res,200,await this.catalog());return true;}

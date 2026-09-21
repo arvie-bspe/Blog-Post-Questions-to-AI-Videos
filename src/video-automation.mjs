@@ -28,10 +28,22 @@ export class ApprovalVideoAutomation {
     return {id:'automatic-'+presenterPool.version,policyVersion:presenterPool.version,mode:'automatic',enabled:true,parent,maxEstimatedCost:2,authorizedBy:'system',authorizedAt:'2026-09-16',authorization:'Automatic selection and generation begins after an individual script approval.'};
   }
   view(parent){
-    if(!this.service.store.get(parent))fail('Article not found.',404);
+    const job=this.service.store.get(parent);if(!job)fail('Article not found.',404);
     const all=this.db.prepare('SELECT payload FROM video_approval_queue WHERE parent=? ORDER BY updated DESC').all(parent).map(r=>JSON.parse(r.payload));
     const runs=all.filter(r=>Number.isInteger(r.index));
-    return {profile:this.profile(parent),lastRun:runs[0]||null,runs};
+    const runIds=new Set(runs.map(r=>r.id)),missingApproved=[];
+    for(const [index,video]of (job.plan?.videos||[]).entries())try{
+      const approvalHash=approved(job,index),id=hash([parent,index,approvalHash]);
+      if(!runIds.has(id))missingApproved.push({index,question:video.question});
+    }catch{}
+    return {profile:this.profile(parent),lastRun:runs[0]||null,runs,missingApproved};
+  }
+
+  startMissing(parent,actor,index){
+    if(!Number.isInteger(index))fail('Choose one approved question to start.');
+    const missing=this.view(parent).missingApproved.find(item=>item.index===index);
+    if(!missing)fail('This question is not approved or already has an automatic video run.',409);
+    return this.enqueue(parent,actor,index);
   }
 
   configure(parent,body,actor){

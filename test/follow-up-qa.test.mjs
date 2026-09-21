@@ -141,6 +141,26 @@ test('prepared worker recovery UI uses the worker retry endpoint instead of HeyG
   assert.deepEqual(calls,[{path:`videos/${saved.id}/retry-worker`,body:{}}]);
 });
 
+test('missing approved video UI starts exactly the absent automatic run',async t=>{
+  const app=appFor(t),parent=app.store.create(approve(source('missing-approved-ui'))),calls=[],previousDocument=globalThis.document;
+  let startButton=null;const root={isConnected:true,innerHTML:'',querySelector:()=>null,querySelectorAll:selector=>{
+    if(selector==='[data-start-approved]'&&root.innerHTML.includes('data-start-approved="0"')){startButton={dataset:{startApproved:'0'},onclick:null};return [startButton];}
+    return [];
+  }};
+  globalThis.document={querySelector:()=>root};t.after(()=>{root.isConnected=false;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;});
+  const missing={index:0,question:parent.plan.videos[0].question};
+  const api=async(path,body)=>{
+    if(path==='video-config')return {...config.video,provider:'liteavatar_worker',configured:true,appearanceRulesHash};
+    if(path===`jobs/${parent.id}/videos`)return [];
+    if(path===`jobs/${parent.id}/video-automation`&&body===undefined)return {runs:[],missingApproved:[missing]};
+    calls.push({path,body});return {runs:[{index:0,status:'queued'}],missingApproved:[]};
+  };
+  await mountVideo(parent,api,message=>assert.fail(message),{name:'QA Reviewer'});
+  assert.match(root.innerHTML,/approved, but automatic generation has not started/);assert.ok(startButton?.onclick);
+  await startButton.onclick();
+  assert.deepEqual(calls,[{path:`jobs/${parent.id}/video-automation`,body:{action:'start-approved',index:0}}]);
+});
+
 for(const changeType of ['render','gender'])test(`${changeType} replacement recovers from logo failure using the same saved video`,async t=>{
   const app=appFor(t),data=source('replacement-'+changeType);
   data.doc.paragraphs.find(p=>p.id==='p5').text='One lawyer says she handles appeals; another says he handles hearings.';

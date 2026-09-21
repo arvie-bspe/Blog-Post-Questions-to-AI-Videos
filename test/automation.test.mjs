@@ -37,6 +37,16 @@ test('one approval submits only its question; repeated approval and resume canno
   h.approve(1);h.service.automation.enqueue(h.parent.id,'Keziah',1);await settle(h);assert.equal(h.submissions.length,2);assert.equal(h.service.automation.view(h.parent.id).runs.length,2);
  }finally{h.close();}
 });
+test('an approved question with no automation run is exposed for one guarded recovery',async()=>{
+ const h=harness();try{
+  h.approve(0);let state=h.service.automation.view(h.parent.id);
+  assert.deepEqual(state.missingApproved,[{index:0,question:h.parent.plan.videos[0].question}]);
+  h.service.closed=true;const entry=h.service.automation.startMissing(h.parent.id,'Arvie',0);await Promise.resolve();
+  state=h.service.automation.view(h.parent.id);assert.equal(state.missingApproved.length,0);assert.equal(state.runs.length,1);assert.equal(state.runs[0].id,entry.id);
+  assert.throws(()=>h.service.automation.startMissing(h.parent.id,'Arvie',0),/already has/);
+  assert.throws(()=>h.service.automation.startMissing(h.parent.id,'Arvie',1),/not approved/);
+ }finally{h.close();}
+});
 test('a missing key holds only the selected question; adding the key resumes exactly one submission',async()=>{
  const h=harness('');try{
   h.service.automation.configure(h.parent.id,settings,'Arvie');h.approve();h.service.automation.enqueue(h.parent.id,'Keziah',0);await settle(h);
