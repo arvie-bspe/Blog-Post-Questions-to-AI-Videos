@@ -118,7 +118,7 @@ export class VideoService {
         await this.ensureLogo(j);
         const look=await this.heygen.look(j.avatar.id);
         if(look?.id!==j.avatar.id||!look.supported_api_engines?.includes('avatar_iv')||(look.status&&look.status!=='completed'))error('The selected presenter is no longer available for Avatar IV. Choose another library presenter.',409);
-        await this.validate(j);if(j.automation)this.automation.assertProfile(j.parentId,j.automation.profileId);this.consume();j.sourceFraming={...sourceFraming};j.stage='video';j.authorization={video:{actor,at:now(),estimate:j.renderEstimate,priceBasis:prices,seconds:j.estimatedSeconds}};
+        await this.validate(j);if(j.automation)this.automation.assertAuthorization(j.parentId,j.automation);this.consume();j.sourceFraming={...sourceFraming};j.stage='video';j.authorization={video:{actor,at:now(),estimate:j.renderEstimate,priceBasis:prices,seconds:j.estimatedSeconds}};
       }
       j.status='working';j.error=null;this.save(j);this.store.record(j.parentId,actor,'heygen_'+action);
       this.work(j).catch(e=>{
@@ -133,7 +133,7 @@ export class VideoService {
     let request=j.requests.video;
     if(request?.state==='submitting'&&!request.id)throw new Error('Submission outcome is unknown. Check HeyGen using this setup ID; do not resubmit.');
     if(!request){
-      await this.validate(j);if(j.automation)this.automation.assertProfile(j.parentId,j.automation.profileId);j.requests.video={state:'submitting',submittedAt:now(),idempotencyKey:j.id};this.save(j);
+      await this.validate(j);if(j.automation)this.automation.assertAuthorization(j.parentId,j.automation);j.requests.video={state:'submitting',submittedAt:now(),idempotencyKey:j.id};this.save(j);
       const result=await this.heygen.submit(requestBody(j),j.id);j.requests.video={...j.requests.video,...result};this.save(j);
     }
     request=j.requests.video;const deadline=Date.now()+30*60*1000;

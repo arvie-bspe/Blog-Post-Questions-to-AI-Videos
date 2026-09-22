@@ -47,10 +47,12 @@ test('real FFmpeg composition retains audio duration, captions, contacts, thumbn
   const tools=mediaTools();try{await tools.check();}catch{return t.skip('Install FFmpeg to run the real composition check.');}
   const dir=mkdtempSync(join(tmpdir(),'video-media-'));
   try{
+    tools.analyzeVisual=async action=>{assert.equal(action,'scene_landscape');return {crop:{x:0,y:0,width:1280,height:720},safeCropX:{min:0,max:0},faceProtected:{left:.36,top:.12,right:.58,bottom:.42},texts:[],fixture:true};};
     await tools.run(['-f','lavfi','-i','sine=frequency=440:duration=3','-c:a','pcm_s16le','voice.wav'],dir);
     await tools.run(['-loop','1','-i',presenterPath,'-vf','scale=1280:720','-r','25','-t','3','-c:v','libx264','-pix_fmt','yuv420p','presenter.mp4'],dir);
-    const j={duration:3,question:'What is this?',thumbnailTitle:'Video Composition Test Only',client:{name:'TEST CLIENT — TECHNICAL FIXTURE',address:'123 Example Street, Example City',phone:'(000) 000-0000'},cues:[{start:0,end:1,text:'WHAT IS THIS?',question:true},{start:1,end:3,text:'Technical fixture only. Not a real voiceover.',question:false}]};
-    const qa=await compose(tools,dir,j);assert.equal(qa.passed,true);assert.equal(qa.fps,25);assert.equal(qa.sourceHeight,720);assert.equal(qa.native1080,false);assert.ok(existsSync(join(dir,'thumbnail.png')));assert.match(readFileSync(join(dir,'captions.vtt'),'utf8'),/00:00:01.000/);
+    copyFileSync(presenterPath,join(dir,'logo.png'));
+    const identity={name:'TEST CLIENT — TECHNICAL FIXTURE',address:'123 Example Street, Example City',phone:'(000) 000-0000'},j={duration:3,format:{aspectRatio:'16:9'},question:'What is this?',thumbnailTitle:'Video Composition Test Only',articleIdentity:identity,endCard:{targetUrl:'https://example.test/article'},source:{targetUrl:'https://example.test/article'},script:'Technical fixture only. Not a real voiceover.',logo:{screening:{relativeLuminance:.02}},cues:[{start:0,end:1,text:'WHAT IS THIS?',question:true},{start:1,end:3,text:'Technical fixture only. Not a real voiceover.',question:false}]};
+    const qa=await compose(tools,dir,j);assert.equal(qa.passed,true);assert.equal(qa.fps,25);assert.equal(qa.sourceHeight,720);assert.equal(qa.native1080,false);assert.equal(qa.aspectRatio,'16:9');assert.equal(qa.logoIncluded,true);assert.equal(qa.endCardSeconds,3);assert.ok(qa.duration>j.duration+2.9);assert.ok(existsSync(join(dir,'thumbnail.png')));assert.ok(existsSync(join(dir,'end-card.png')));assert.match(readFileSync(join(dir,'captions.vtt'),'utf8'),/00:00:01.000/);
   }finally{rmSync(dir,{recursive:true,force:true});}
 });
 
@@ -108,6 +110,8 @@ test('HeyGen request binds approved text and public presenter without an image o
     assert.equal(body.script,scriptText(h.parent.plan.videos[0]));assert.equal(body.avatar_id,avatar.id);assert.equal(body.voice_id,voice.id);assert.equal(body.engine.type,'avatar_iv');
     assert.equal(body.resolution,'1080p');assert.equal(body.aspect_ratio,'auto');assert.equal(body.fit,'contain');assert.equal(j.format.aspectRatio,'9:16');assert.equal(j.sourceFraming.version,'preserve-source-1');assert.equal(body.image_url,undefined);assert.equal(body.audio_url,undefined);assert.equal(body.caption.style,undefined);
     assert.equal(estimate('studio_avatar'),2);assert.equal(estimate('photo_avatar'),1.5);
+    const landscape=prepareHeyGen(h.parent,{...hgSettings,aspectRatio:'16:9'},avatar,voice);assert.deepEqual(landscape.format,{width:1920,height:1080,aspectRatio:'16:9'});assert.notEqual(landscape.identity,j.identity);
+    assert.throws(()=>prepareHeyGen(h.parent,{...hgSettings,aspectRatio:'1:1'},avatar,voice),/portrait 9:16 or landscape 16:9/);
     assert.throws(()=>prepareHeyGen(h.parent,hgSettings,null,voice),/library/);
     assert.throws(()=>prepareHeyGen(h.parent,hgSettings,{...avatar,type:'photo_avatar'},voice),/Photo Avatars are disabled/);
     const longer=structuredClone(h.parent);longer.plan.videos[0].sentences=Array(8).fill(longer.plan.videos[0].sentences[0]);approveFixture(longer,0);assert.throws(()=>prepareHeyGen(longer,hgSettings,avatar,voice),/content checks/);

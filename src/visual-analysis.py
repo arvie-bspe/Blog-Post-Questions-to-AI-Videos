@@ -70,6 +70,37 @@ def main():
  if not faces or misses/max(1,frames)>0.2:raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: face position could not be tracked reliably.')
  face=np.median(np.array(faces),axis=0);fx,fy,fw,fh=face
  left=max(b[0] for b in bounds);top=max(b[1] for b in bounds);right=min(b[2] for b in bounds);bottom=min(b[3] for b in bounds)
+ if action=='scene_landscape':
+  all_faces=np.array(faces);centersx=all_faces[:,0]+all_faces[:,2]/2;centersy=all_faces[:,1]+all_faces[:,3]/2
+  # A native landscape studio frame is already the safest complete scene.
+  # Ignore texture-only bounds in that case so a plain office wall is not
+  # mistaken for provider padding.
+  source_ratio=width/max(1,height)
+  if 1.55<=source_ratio<=2.0:left,top,right,bottom=0,0,width,height
+  maximum=int(min(bottom-top,(right-left)*9/16)//2*2);chosen=None
+  candidates=list(range(maximum,159,-16))
+  if maximum>=160 and (not candidates or candidates[0]!=maximum):candidates.insert(0,maximum)
+  for ch in candidates:
+   cw=int(ch*16/9);cw-=cw%2
+   if not cw or cw>right-left:continue
+   if np.min(all_faces[:,3]/ch)<.08 or np.max(all_faces[:,3]/ch)>.45:continue
+   pad=np.maximum(8,all_faces[:,2]*.08)
+   xmin=max(left,np.max(centersx)-.70*cw,np.max(all_faces[:,0]+all_faces[:,2]+pad)-cw)
+   xmax=min(right-cw,np.min(centersx)-.30*cw,np.min(all_faces[:,0]-pad))
+   ymin=max(top,np.max(centersy)-.46*ch)
+   ymax=min(bottom-ch,np.min(centersy)-.08*ch,np.min(all_faces[:,1]-.25*all_faces[:,3]))
+   if np.ceil(xmin)>np.floor(xmax) or np.ceil(ymin)>np.floor(ymax):continue
+   x=int(np.clip(round(fx+fw/2-cw/2),np.ceil(xmin),np.floor(xmax)))
+   y=int(np.clip(round(fy+fh/2-ch*.25),np.ceil(ymin),np.floor(ymax)))
+   chosen=(x,y,cw,ch);break
+  if chosen is None:raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: no single landscape crop preserves the head and upper torso throughout the clip.')
+  x,y,cw,ch=chosen;protected=[]
+  for ax,ay,aw,ah in faces:
+   centerx=(ax+aw/2-x)/cw;centery=(ay+ah/2-y)/ch;faceheight=ah/ch
+   if not(.30<=centerx<=.70 and .08<=centery<=.46 and .08<=faceheight<=.45):raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: cannot preserve the presenter safely in the landscape crop.')
+   if ay-.25*ah<y or ax<x or ax+aw>x+cw:raise ValueError('SOURCE_FRAMING_INCOMPATIBLE: landscape cropping would cut the head.')
+   protected.append([(ax-x)/cw-.03,(ay-y)/ch-.03,(ax+aw-x)/cw+.03,(ay+ah-y)/ch+.03])
+  return {'crop':{'x':x,'y':y,'width':cw,'height':ch},'safeCropX':{'min':int(np.ceil(xmin)),'max':int(np.floor(xmax))},'sceneBounds':{'left':left,'top':top,'right':right,'bottom':bottom},'framingMode':'tracked_landscape_crop','faceProtected':{'left':min(p[0] for p in protected),'top':min(p[1] for p in protected),'right':max(p[2] for p in protected),'bottom':max(p[3] for p in protected)},'framesInspected':frames,'faceDetectionMisses':misses,'texts':list(dict.fromkeys(texts)),'anatomicalReviewRequired':True,'ocrScope':'one source frame every two seconds; Macy must inspect the complete output'}
  # Face height is an approximate anatomical anchor; the final head/shoulders/torso must be reviewed.
  # Solve one fixed crop against every tracked position. A median-only crop can
  # wrongly fail ordinary speaker movement, even when a slightly wider crop fits.

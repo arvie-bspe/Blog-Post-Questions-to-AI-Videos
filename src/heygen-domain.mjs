@@ -11,6 +11,11 @@ export const prices={checked:'2026-09-15',currency:'USD',engine:'avatar_iv',phot
 // Provider-side 9:16 cover can irreversibly remove an off-center presenter's face.
 export const sourceFraming={version:'preserve-source-1',aspectRatio:'auto',fit:'contain'};
 export const estimate=(type,seconds=30)=>Number(((type==='photo_avatar'?prices.photoPerMinute:prices.studioPerMinute)*seconds/60).toFixed(2));
+export function outputFormat(value='9:16'){
+  if(value==='9:16')return {width:1080,height:1920,aspectRatio:value};
+  if(value==='16:9')return {width:1920,height:1080,aspectRatio:value};
+  throw new Error('Choose portrait 9:16 or landscape 16:9 output.');
+}
 export function prepare(job,body,avatar,voice){
   if(job.setupIssues?.length)throw new Error('This saved draft is for script review only. Add its Visual folder in column L, then inspect the live row again before video generation.');
   const index=body.index,approvalHash=approved(job,index),video=job.plan.videos[index];
@@ -21,7 +26,7 @@ export function prepare(job,body,avatar,voice){
   if(body.presenterAccepted!==true)throw new Error('Confirm the selected HeyGen presenter and voice.');
   const title=String(body.thumbnailTitle||'').trim();
   if(title.length>80||title.split(/\s+/).length<3||title.split(/\s+/).length>6||/[{}\\\r\n<>]/.test(title))throw new Error('Use a thumbnail topic of 3 to 6 words without special markup.');
-  const text=scriptText(video),wordCount=text.trim().split(/\s+/).length,targetSeconds=scriptTargetSeconds(job);
+  const text=scriptText(video),wordCount=text.trim().split(/\s+/).length,targetSeconds=scriptTargetSeconds(job),format=outputFormat(body.aspectRatio);
   const articleIdentity=requireArticleIdentity(job.doc,job.plan.articleIdentity);
   const endCard={...endCardData({articleIdentity,script:text,source:{targetUrl:job.row.pageUrl}}),seconds:3};
   if(wordCount>75&&(!video.runtimeReason||video.runtimeReason.trim().length<20))throw new Error('Explain why the longer script is necessary for accuracy, then have a script reviewer check it.');
@@ -30,8 +35,8 @@ export function prepare(job,body,avatar,voice){
   const avatarSnapshot={id:avatar.id,name:avatar.name,type:avatar.type,personKey:avatar.personKey,gender:avatar.gender},voiceSnapshot={id:voice.id,name:voice.name,language:voice.language,gender:voice.gender};
   return {provider:'heygen',sourceFraming,layoutVersion,endCard,articleIdentity,parentId:job.id,index,approvalHash,script:text,scriptHash:hash(text),question:video.question,thumbnailTitle:title,avatar:avatarSnapshot,voice:voiceSnapshot,
     client:job.client,source:{documentUrl:job.row.documentUrl,sourceHash:job.doc.sourceHash,mode:job.mode,rulesHash:job.rulesHash,folderUrl:job.row.folderUrl},
-    models:{video:'heygen/avatar_iv'},format:{width:1080,height:1920,aspectRatio:'9:16'},logoRequired:true,outputRevision:1,prices,targetSeconds,wordCount,runtimeReason:video.runtimeReason||'',estimatedSeconds:Math.max(targetSeconds,Math.ceil(wordCount/2.2)),renderEstimate:estimate(avatar.type,Math.max(targetSeconds,Math.ceil(wordCount/2.2))),
-    identity:hash(['heygen/avatar_iv',job.id,index,approvalHash,avatarSnapshot,voiceSnapshot,title,targetSeconds,'9:16',config.version,sourceFraming.version]),status:'prepared',requests:{},files:{},reviews:[]};
+    models:{video:'heygen/avatar_iv'},format,logoRequired:true,outputRevision:1,prices,targetSeconds,wordCount,runtimeReason:video.runtimeReason||'',estimatedSeconds:Math.max(targetSeconds,Math.ceil(wordCount/2.2)),renderEstimate:estimate(avatar.type,Math.max(targetSeconds,Math.ceil(wordCount/2.2))),
+    identity:hash(['heygen/avatar_iv',job.id,index,approvalHash,avatarSnapshot,voiceSnapshot,title,targetSeconds,format.aspectRatio,config.version,sourceFraming.version]),status:'prepared',requests:{},files:{},reviews:[]};
 }
 export const requestBody=j=>({type:'avatar',avatar_id:j.avatar.id,voice_id:j.voice.id,script:j.script,
   title:j.thumbnailTitle+' · '+j.id,resolution:'1080p',aspect_ratio:sourceFraming.aspectRatio,fit:sourceFraming.fit,remove_background:false,

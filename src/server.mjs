@@ -228,9 +228,15 @@ export function createApp(env=process.env){
           }
           if(body.decision==='skip'&&current.status!=='pending')fail('Only a pending question can be skipped.',409);
           if(body.decision==='restore'&&current.status!=='skipped')fail('Only a skipped question can be returned to review.',409);
-          const review=recordQuestionReview(job,index,{actor,decision:body.decision,note:body.note.trim(),checkedEvidence:Boolean(body.checkedEvidence),checkedWarnings:Boolean(body.checkedWarnings),at:new Date().toISOString(),testOnly:true,authenticated:!security.local});
+          let overrideProfile=null;
+          if(body.videoOverride!==undefined){
+            if(account.role!=='admin')fail('An admin manages one-time script approval and video-format overrides.',403);
+            if(body.decision!=='approve')fail('A one-time video override can only accompany an approval.');
+            overrideProfile=video.automation.oneTimeApproval(job.id,index,body.videoOverride,actor);
+          }
+          const review=recordQuestionReview(job,index,{actor,decision:body.decision,note:body.note.trim(),checkedEvidence:Boolean(body.checkedEvidence),checkedWarnings:Boolean(body.checkedWarnings),at:new Date().toISOString(),testOnly:true,authenticated:!security.local,...(overrideProfile?{adminOverride:{type:'one_time_script_and_video_approval',reviewerReplaced:'Keziah',aspectRatio:overrideProfile.aspectRatio,maxEstimatedCost:overrideProfile.maxEstimatedCost,reason:overrideProfile.authorization}}:{})});
           job.error=null;store.record(job.id,actor,'question_'+index+'_review_'+body.decision);store.save(job);
-          if(body.decision==='approve')video.automation.enqueue(job.id,actor,index);else if(body.decision==='reject')job=await scripts.start(job.id,review.note,index);
+          if(body.decision==='approve')video.automation.enqueue(job.id,actor,index,overrideProfile?{profile:overrideProfile}:undefined);else if(body.decision==='reject')job=await scripts.start(job.id,review.note,index);
           if(['skip','restore'].includes(body.decision))job=store.get(job.id);
           const currentVideos=video.list(job.id).filter(currentVideo).map(v=>({id:v.id,parentId:v.parentId,index:v.index,status:v.status}));
           return send(res,200,{...job,questionStates:job.plan.videos.map((_,i)=>questionState(job,i)),currentStep:workflowStep(job,currentVideos)});

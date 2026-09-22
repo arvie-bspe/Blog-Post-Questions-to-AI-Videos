@@ -62,6 +62,15 @@ export class ApprovalVideoAutomation {
     this.db.prepare('INSERT OR REPLACE INTO video_automation_profiles VALUES(?,?)').run(parent,JSON.stringify(profile));
     this.service.store.record(parent,actor,'enable_video_after_content_approval');return this.view(parent);
   }
+  oneTimeApproval(parent,index,body,actor){
+    if(!this.service.store.get(parent))fail('Article not found.',404);
+    if(!Number.isInteger(index))fail('Choose one specific question for the approval override.');
+    const aspectRatio=body?.aspectRatio,limit=Number(body?.maxEstimatedCost),reason=String(body?.reason||'').trim();
+    if(!['9:16','16:9'].includes(aspectRatio))fail('Choose portrait 9:16 or landscape 16:9 for this video.');
+    if(body?.acceptCost!==true||!Number.isFinite(limit)||limit<2||limit>12)fail('Accept the one-time HeyGen allowance ($2–$12 for this video). Actual duration may change the charge.');
+    if(reason.length<20||reason.length>1000)fail('Explain the one-time approval override in 20 to 1000 characters.');
+    return {id:randomUUID(),policyVersion:presenterPool.version,mode:'one_time_approval_override',enabled:true,parent,index,aspectRatio,maxEstimatedCost:limit,authorizedBy:actor,authorizedAt:now(),authorization:reason};
+  }
   enqueue(parent,actor,index,{profile=this.profile(parent),manualRecovery=false}={}){
     if(!profile?.enabled)return {status:'configuration_needed'};
     const job=this.service.store.get(parent),approvalHash=approved(job,index),id=hash([parent,index,approvalHash]);
@@ -77,9 +86,15 @@ export class ApprovalVideoAutomation {
     }
   }
   assertProfile(parent,id){const current=this.profile(parent);if(!current?.enabled||current.id!==id)throw new Error('Automatic video settings changed or were disabled. Review this saved question approval before submission.');}
-  async reuse(parent,index,approvalHash){
+  assertAuthorization(parent,automation){
+    if(automation?.profileMode!=='one_time_approval_override')return this.assertProfile(parent,automation?.profileId);
+    const row=this.db.prepare('SELECT payload FROM video_approval_queue WHERE id=? AND parent=?').get(automation.approvalQueueId,parent);
+    const entry=row?JSON.parse(row.payload):null,profile=entry?.profile;
+    if(!profile?.enabled||profile.mode!=='one_time_approval_override'||profile.id!==automation.profileId||profile.parent!==parent||profile.index!==automation.index||entry.index!==automation.index||entry.approvalHash!==automation.approvalHash||profile.aspectRatio!==automation.aspectRatio)throw new Error('This one-time video approval is no longer bound to the saved question and output format.');
+  }
+  async reuse(parent,index,approvalHash,aspectRatio='9:16'){
     const s=this.service,script=scriptText(parent.plan.videos[index]);
-    const matches=s.list(parent.id).filter(j=>j.provider==='heygen'&&j.index===index&&j.script===script&&j.source?.sourceHash===parent.doc.sourceHash);
+    const matches=s.list(parent.id).filter(j=>j.provider==='heygen'&&j.index===index&&j.script===script&&j.source?.sourceHash===parent.doc.sourceHash&&(j.format?.aspectRatio||'9:16')===aspectRatio);
     if(matches.some(j=>j.status==='needs_reconciliation'||j.requests?.video?.state==='submitting'&&!j.requests.video.id))throw new Error('This question has an uncertain earlier paid submission. Reconcile it before any replacement.');
     const paid=matches.filter(j=>j.requests?.video?.id);if(!paid.length)return null;
     const compatible=paid.filter(j=>!presenterIssue(j.avatar,j.voice));
@@ -106,6 +121,9 @@ export class ApprovalVideoAutomation {
       const provider=videoProvider(service.env);
       if(entry.manualRecovery){
         if(entry.profile?.mode!=='single_approved_recovery'||!isWorkerVideoProvider(provider))throw new Error('This one-time recovery is limited to the configured self-hosted video worker.');
+      }else if(entry.profile?.mode==='one_time_approval_override'){
+        const profile=entry.profile;
+        if(!profile.enabled||profile.parent!==entry.parent||profile.index!==entry.index||!['9:16','16:9'].includes(profile.aspectRatio)||!Number.isFinite(profile.maxEstimatedCost)||profile.maxEstimatedCost<2||profile.maxEstimatedCost>12)throw new Error('This one-time video approval is invalid.');
       }else this.assertProfile(entry.parent,entry.profile.id);
       const parent=service.store.get(entry.parent);if(approved(parent,entry.index)!==entry.approvalHash)throw new Error('This question or its review changed. A new individual approval is required.');
       await service.checkFresh(parent,entry.index);entry.status='working';entry.error=null;this.save(entry);
@@ -115,22 +133,22 @@ export class ApprovalVideoAutomation {
       if(isWorkerVideoProvider(provider)){
         const local=await queueWorkerVideo(service,parent,entry.index,entry.triggeredBy,provider);entry.videos=[local.id];entry.selection={avatar:local.avatar,voice:local.voice,selection:{method:provider==='liteavatar_worker'?'liteavatar_cpu_trial_profiles':'approved_local_assets'}};entry.status='submitted';entry.error=null;this.save(entry);return;
       }
-      const prior=await this.reuse(parent,entry.index,entry.approvalHash);
+      const prior=await this.reuse(parent,entry.index,entry.approvalHash,entry.profile.aspectRatio||'9:16');
       if(prior){entry.videos=[prior.id];entry.reusedExisting=true;const held=['needs_attention','needs_reconciliation','failed','paused','changes_requested'].includes(prior.status);entry.status=held?'blocked':'submitted';entry.error=held?(prior.error||'The saved video needs attention. No replacement was purchased.'):null;this.save(entry);return;}
       if(!service.env.HEYGEN_API_KEY)throw new Error('HEYGEN_API_KEY is missing. Add it privately in Railway; this question approval can continue afterward.');
       await service.ready;
       const profile=entry.profile,index=entry.index;
       if(!entry.selection){
         const reserved=this.view(parent.id).runs.filter(r=>r.id!==entry.id&&r.selection).map(r=>r.selection);
-        entry.selection=profile.mode==='automatic'?choosePresenter(parent,index,service.list(),reserved):{avatar:profile.avatar,voice:profile.voice,selection:{method:'admin_override'}};this.save(entry);
+        entry.selection=profile.mode==='manual_override'?{avatar:profile.avatar,voice:profile.voice,selection:{method:'admin_override'}}:choosePresenter(parent,index,service.list(),reserved);this.save(entry);
       }
-      const chosen=entry.selection,settings={index,avatarId:chosen.avatar.id,voiceId:chosen.voice.id,presenterAccepted:true,thumbnailTitle:parent.plan.videos[index].thumbnailTitle||topic(parent.plan.videos[index].question)},planned=prepare(parent,settings,chosen.avatar,chosen.voice);
+      const chosen=entry.selection,settings={index,avatarId:chosen.avatar.id,voiceId:chosen.voice.id,presenterAccepted:true,thumbnailTitle:parent.plan.videos[index].thumbnailTitle||topic(parent.plan.videos[index].question),aspectRatio:profile.aspectRatio||'9:16'},planned=prepare(parent,settings,chosen.avatar,chosen.voice);
       if(planned.renderEstimate>profile.maxEstimatedCost)throw new Error(`Question ${index+1} is estimated at $${planned.renderEstimate.toFixed(2)}, above the $${profile.maxEstimatedCost.toFixed(2)} allowance.`);
       service.avatars.set(chosen.avatar.id,chosen.avatar);service.voices.set(chosen.voice.id,chosen.voice);
       const j=await service.create(parent.id,settings,profile.authorizedBy);entry.videos=[j.id];this.save(entry);
       if(j.status==='prepared'){
-        this.assertProfile(entry.parent,profile.id);
-        const saved=service.get(j.id);saved.selection=chosen.selection;saved.automation={approvalQueueId:entry.id,index,triggeredBy:entry.triggeredBy,authorizedBy:profile.authorizedBy,profileId:profile.id};service.save(saved);
+        if(profile.mode!=='one_time_approval_override')this.assertProfile(entry.parent,profile.id);
+        const saved=service.get(j.id);saved.selection=chosen.selection;saved.automation={approvalQueueId:entry.id,index,approvalHash:entry.approvalHash,aspectRatio:settings.aspectRatio,triggeredBy:entry.triggeredBy,authorizedBy:profile.authorizedBy,profileId:profile.id,profileMode:profile.mode};service.save(saved);
         await service.start(j.id,'render',{acceptCost:true,acceptedEstimate:j.renderEstimate},profile.authorizedBy);
       }else if(['paused','needs_reconciliation','needs_attention','failed','changes_requested'].includes(j.status))throw new Error('This question’s saved video needs attention. Resume or inspect it; no replacement was purchased.');
       entry.status='submitted';entry.error=null;this.save(entry);

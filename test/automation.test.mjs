@@ -56,6 +56,16 @@ test('an explicit recovery starts one worker video while a historical article pr
   assert.equal(state.missingApproved.length,0);assert.equal(state.runs.length,1);assert.equal(state.profile.enabled,false);
  }finally{h.close();}
 });
+test('one-time admin approval binds one question, landscape output, and a higher cost allowance without changing the article profile',async()=>{
+ const h=harness();try{
+  h.service.heygen.look=async id=>({...presenterPool.avatars.find(a=>a.id===id),supported_api_engines:['avatar_iv'],status:'completed'});
+  h.approve(0);const before=h.service.automation.profile(h.parent.id),profile=h.service.automation.oneTimeApproval(h.parent.id,0,{aspectRatio:'16:9',maxEstimatedCost:5,acceptCost:true,reason:'Arvie authorized this single script and landscape video instead of Keziah.'},'Arvie');
+  const entry=h.service.automation.enqueue(h.parent.id,'Arvie',0,{profile});await settle(h);
+  assert.equal(h.submissions.length,1,h.service.automation.view(h.parent.id).lastRun?.error);assert.equal(entry.profile.mode,'one_time_approval_override');assert.equal(h.service.automation.profile(h.parent.id).id,before.id);
+  const generated=h.service.list(h.parent.id)[0];assert.equal(generated.format.aspectRatio,'16:9');assert.equal(generated.automation.profileMode,'one_time_approval_override');assert.equal(generated.automation.aspectRatio,'16:9');assert.doesNotThrow(()=>h.service.automation.assertAuthorization(h.parent.id,generated.automation));
+  assert.throws(()=>h.service.automation.oneTimeApproval(h.parent.id,1,{aspectRatio:'1:1',maxEstimatedCost:5,acceptCost:true,reason:'This fixture reason is long enough for validation.'},'Arvie'),/portrait 9:16 or landscape 16:9/);
+ }finally{h.close();}
+});
 test('a missing key holds only the selected question; adding the key resumes exactly one submission',async()=>{
  const h=harness('');try{
   h.service.automation.configure(h.parent.id,settings,'Arvie');h.approve();h.service.automation.enqueue(h.parent.id,'Keziah',0);await settle(h);
