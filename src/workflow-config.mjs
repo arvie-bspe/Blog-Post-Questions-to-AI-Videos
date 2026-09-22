@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 
-export const workflowVersion='3.0.10';
+export const workflowVersion='3.0.11';
 export const scriptPolicyVersion='independent-source-review-1';
 export const scriptPolicyHash=createHash('sha256').update(scriptPolicyVersion).digest('hex');
 export const aiProvider=env=>env.AI_PROVIDER||'codex_worker';
