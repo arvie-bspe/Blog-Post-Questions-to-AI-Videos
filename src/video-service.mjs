@@ -118,7 +118,8 @@ export class VideoService {
       if(action==='render'){
         // This is the last local gate before a new paid provider request. A
         // resume skips it because it continues the same saved request.
-        assertFreshPresenterPair(j,this.list().filter(video=>video.id!==j.id));
+        const reserved=[...this.active].filter(activeId=>activeId!==j.id).map(activeId=>this.get(activeId));
+        assertFreshPresenterPair(j,this.list().filter(video=>video.id!==j.id),reserved);
         await this.ensureLogo(j);
         const look=await this.heygen.look(j.avatar.id);
         if(look?.id!==j.avatar.id||!look.supported_api_engines?.includes('avatar_iv')||(look.status&&look.status!=='completed'))error('The selected presenter is no longer available for Avatar IV. Choose another library presenter.',409);

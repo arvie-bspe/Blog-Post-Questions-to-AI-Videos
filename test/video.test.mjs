@@ -81,6 +81,13 @@ test('mismatched manual profiles and saved setups cannot consume the daily allow
  }finally{h.close();}
 });
 
+test('a manually prepared render cannot reuse an avatar or voice reserved by another active render',async()=>{
+ const h=harness();try{
+  approveFixture(h.parent,1);h.store.save(h.parent);const first=await h.service.create(h.parent.id,hgSettings,'Arvie'),second=await h.service.create(h.parent.id,{...hgSettings,index:1},'Arvie');h.service.active.add(first.id);
+  await assert.rejects(h.service.start(second.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie'),/ROTATION_UNAVAILABLE/);assert.deepEqual(h.service.get(second.id).requests,{});assert.equal(h.store.db.prepare('SELECT count(*) AS n FROM video_spend').get().n,0);
+ }finally{h.close();}
+});
+
 test('LiteAvatar selection blocks every HeyGen spend path and routes historical live Google approvals to the CPU worker',async()=>{
   let providerCalls=0;const queued=[],h=harness({env:{HEYGEN_API_KEY:'still-present-but-disabled',VIDEO_PROVIDER:'liteavatar_worker',STUDIO_WORKER_TOKEN:'worker-secret'.padEnd(32,'x')},heygen:{looks:async()=>{providerCalls++;return {data:[]};},submit:async()=>{providerCalls++;throw new Error('HeyGen must not be called.');}}});
   try{
