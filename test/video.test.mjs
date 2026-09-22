@@ -12,11 +12,12 @@ import {prepare as prepareHeyGen,subtitles,requestBody,estimate} from '../src/he
 import {prepare,approved,captions,scriptText} from '../src/video-domain.mjs';
 import {Fal,mediaURL,queueURL} from '../src/fal.mjs';
 import {mediaTools,presenterPath,compose} from '../src/media.mjs';
-import {config,rulesHash} from '../src/rules.mjs';
+import {appearanceRulesHash,config,rulesHash} from '../src/rules.mjs';
 import {parseClients,parseMonthly,selectClient,inspect} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {finishWorkerVideo} from '../src/local-video.mjs';
 import {fixture} from './fixture-data.mjs';
+import {scriptPolicyHash} from '../src/workflow-config.mjs';
 function parent(store){
   const source=fixture('paul'),row=parseMonthly(fixture('monthly')).find(r=>r.documentId===source.documentId),client=selectClient(parseClients(fixture('clients')),row.clientKey),doc=inspect(source,row.titleHint);
   const j=store.create({identity:'test',doc,row,client,rulesHash,rulesVersion:config.version,mode:'saved_snapshot'});
@@ -109,6 +110,8 @@ test('HeyGen request binds approved text and public presenter without an image o
     const j=prepareHeyGen(h.parent,hgSettings,avatar,voice);j.id='test-uuid';const body=requestBody(j);
     assert.equal(body.script,scriptText(h.parent.plan.videos[0]));assert.equal(body.avatar_id,avatar.id);assert.equal(body.voice_id,voice.id);assert.equal(body.engine.type,'avatar_iv');
     assert.equal(body.resolution,'1080p');assert.equal(body.aspect_ratio,'auto');assert.equal(body.fit,'contain');assert.equal(j.format.aspectRatio,'9:16');assert.equal(j.sourceFraming.version,'preserve-source-1');assert.equal(body.image_url,undefined);assert.equal(body.audio_url,undefined);assert.equal(body.caption.style,undefined);
+    assert.equal(j.source.rulesHash,rulesHash);
+    const directParent=structuredClone(h.parent);directParent.mode='direct_google';directParent.scriptRulesHash=scriptPolicyHash;directParent.appearanceRulesHash=appearanceRulesHash;directParent.questionReviews=[];directParent.reviews=[];approveFixture(directParent);const direct=prepareHeyGen(directParent,hgSettings,avatar,voice);assert.equal(direct.source.rulesHash,appearanceRulesHash);assert.notEqual(direct.identity,j.identity);
     assert.equal(estimate('studio_avatar'),2);assert.equal(estimate('photo_avatar'),1.5);
     const landscape=prepareHeyGen(h.parent,{...hgSettings,aspectRatio:'16:9'},avatar,voice);assert.deepEqual(landscape.format,{width:1920,height:1080,aspectRatio:'16:9'});assert.notEqual(landscape.identity,j.identity);
     assert.throws(()=>prepareHeyGen(h.parent,{...hgSettings,aspectRatio:'1:1'},avatar,voice),/portrait 9:16 or landscape 16:9/);

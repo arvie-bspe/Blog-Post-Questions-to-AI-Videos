@@ -1,10 +1,10 @@
-import {config} from './rules.mjs';
+import {appearanceRulesHash,config,rulesHash} from './rules.mjs';
 import {hash} from './domain.mjs';
 import {approved,scriptText} from './video-domain.mjs';
 import {endCardData,layoutVersion} from './visual-checks.mjs';
 import {requireArticleIdentity} from './article-identity.mjs';
 import {matchingPresenter} from './presenter-compatibility.mjs';
-import {scriptTargetSeconds} from './workflow-config.mjs';
+import {directMode,scriptTargetSeconds} from './workflow-config.mjs';
 
 export const prices={checked:'2026-09-15',currency:'USD',engine:'avatar_iv',photoPerMinute:3,studioPerMinute:4,source:'https://help.heygen.com/en/articles/10060327-heygen-api-pricing-explained'};
 // Preserve the source scene before Railway centers the presenter in a portrait crop.
@@ -27,6 +27,7 @@ export function prepare(job,body,avatar,voice){
   const title=String(body.thumbnailTitle||'').trim();
   if(title.length>80||title.split(/\s+/).length<3||title.split(/\s+/).length>6||/[{}\\\r\n<>]/.test(title))throw new Error('Use a thumbnail topic of 3 to 6 words without special markup.');
   const text=scriptText(video),wordCount=text.trim().split(/\s+/).length,targetSeconds=scriptTargetSeconds(job),format=outputFormat(body.aspectRatio);
+  const activeRulesHash=job.mode===directMode?appearanceRulesHash:rulesHash;
   const articleIdentity=requireArticleIdentity(job.doc,job.plan.articleIdentity);
   const endCard={...endCardData({articleIdentity,script:text,source:{targetUrl:job.row.pageUrl}}),seconds:3};
   if(wordCount>75&&(!video.runtimeReason||video.runtimeReason.trim().length<20))throw new Error('Explain why the longer script is necessary for accuracy, then have a script reviewer check it.');
@@ -34,9 +35,9 @@ export function prepare(job,body,avatar,voice){
   if([text,articleIdentity.name,articleIdentity.address,articleIdentity.phone].some(t=>typeof t!=='string'||!t.trim()||/[{}\\<>\x00-\x08]/.test(t)))throw new Error('Script or contact details are missing or contain unsupported markup.');
   const avatarSnapshot={id:avatar.id,name:avatar.name,type:avatar.type,personKey:avatar.personKey,gender:avatar.gender},voiceSnapshot={id:voice.id,name:voice.name,language:voice.language,gender:voice.gender};
   return {provider:'heygen',sourceFraming,layoutVersion,endCard,articleIdentity,parentId:job.id,index,approvalHash,script:text,scriptHash:hash(text),question:video.question,thumbnailTitle:title,avatar:avatarSnapshot,voice:voiceSnapshot,
-    client:job.client,source:{documentUrl:job.row.documentUrl,sourceHash:job.doc.sourceHash,mode:job.mode,rulesHash:job.rulesHash,folderUrl:job.row.folderUrl},
+    client:job.client,source:{documentUrl:job.row.documentUrl,sourceHash:job.doc.sourceHash,mode:job.mode,rulesHash:activeRulesHash,folderUrl:job.row.folderUrl},
     models:{video:'heygen/avatar_iv'},format,logoRequired:true,outputRevision:1,prices,targetSeconds,wordCount,runtimeReason:video.runtimeReason||'',estimatedSeconds:Math.max(targetSeconds,Math.ceil(wordCount/2.2)),renderEstimate:estimate(avatar.type,Math.max(targetSeconds,Math.ceil(wordCount/2.2))),
-    identity:hash(['heygen/avatar_iv',job.id,index,approvalHash,avatarSnapshot,voiceSnapshot,title,targetSeconds,format.aspectRatio,config.version,sourceFraming.version]),status:'prepared',requests:{},files:{},reviews:[]};
+    identity:hash(['heygen/avatar_iv',job.id,index,approvalHash,avatarSnapshot,voiceSnapshot,title,targetSeconds,format.aspectRatio,config.version,activeRulesHash,sourceFraming.version]),status:'prepared',requests:{},files:{},reviews:[]};
 }
 export const requestBody=j=>({type:'avatar',avatar_id:j.avatar.id,voice_id:j.voice.id,script:j.script,
   title:j.thumbnailTitle+' · '+j.id,resolution:'1080p',aspect_ratio:sourceFraming.aspectRatio,fit:sourceFraming.fit,remove_background:false,
