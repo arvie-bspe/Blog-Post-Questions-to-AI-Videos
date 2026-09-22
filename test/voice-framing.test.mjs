@@ -40,6 +40,10 @@ test('appearance migration preserves existing per-question decisions without gra
  const dir=mkdtempSync(join(tmpdir(),'voice-migration-')),store=new Store(join(dir,'db'));
  try{const p=parent(store,config.rules.visualOnlyFromHashes.at(-1));approveFixture(p,0);store.save(p);const before=questionState(p,0),sibling=questionState(p,1);reconcileRules(store);const next=store.get(p.id);assert.equal(next.rulesHash,rulesHash);assert.equal(questionState(next,0).draftHash,before.draftHash);assert.equal(questionState(next,0).status,'approved');assert.equal(questionState(next,1).draftHash,sibling.draftHash);assert.equal(questionState(next,1).status,'pending');assert.doesNotThrow(()=>approvedQuestion(next,0));}finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
+test('future-render rotation migration preserves existing script approvals and videos',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'rotation-migration-')),store=new Store(join(dir,'db'));
+ try{const p=parent(store,config.rules.approvalCompatibleFromHashes.at(-1));approveFixture(p,0);store.save(p);const before=questionState(p,0);reconcileRules(store);const next=store.get(p.id);assert.equal(next.rulesHash,rulesHash);assert.equal(questionState(next,0).draftHash,before.draftHash);assert.equal(questionState(next,0).status,'approved');assert.doesNotThrow(()=>approvedQuestion(next,0));assert.match(next.layoutNotice,/future paid renders/i);assert.equal(next.error,null);assert.match(next.history.at(-1).reason,/Future-render workflow/);}finally{store.close();rmSync(dir,{recursive:true,force:true});}
+});
 test('paid mismatch is blocked; a matching older source is rebuilt after only its own approval with no provider call',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'voice-rebuild-')),store=new Store(join(dir,'db'));let paid=0;
  const s=new VideoService({store,env:{},dataDir:dir,local:true,checkFresh:async()=>{},media:{check:async()=>{}},heygen:{submit:async()=>{paid++;}},logos:{},delivery:{}});

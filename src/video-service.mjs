@@ -11,9 +11,10 @@ import {HeyGen,providerId} from './heygen.mjs';
 import {mediaTools,durationOf,compose} from './media.mjs';
 import {layoutVersion,detectorVersion} from './visual-checks.mjs';
 import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
+import {assertFreshPresenterPair} from './presenter-selection.mjs';
 import {applyLocalVideoTask,finishWorkerVideo,retryWorkerVideo} from './local-video.mjs';
 import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
-import {rulesHash,appearanceRulesHash} from './rules.mjs';
+import {config,rulesHash,appearanceRulesHash} from './rules.mjs';
 import {presenterGender} from './article-identity.mjs';
 const error=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
@@ -40,7 +41,7 @@ export class VideoService {
   save(j){j.updated=now();this.db.prepare('INSERT INTO videos VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated,payload=excluded.payload').run(j.id,j.identity,j.parentId,j.updated,JSON.stringify(j));return j;}
   directory(j){const dir=join(this.dataDir,'videos',j.id);mkdirSync(dir,{recursive:true});return dir;}
   assertHeyGenEnabled(){if(videoProvider(this.env)!=='heygen')error('HeyGen API generation is disabled while the Railway LiteAvatar CPU provider is active.',409);}
-  async catalog(){await this.ready;const provider=videoProvider(this.env),worker=isWorkerVideoProvider(provider),lite=provider==='liteavatar_worker';return {backend:lite?'Railway CPU · Kokoro + LiteAvatar':worker?'Private worker · Kokoro + SadTalker':'HeyGen',provider,configured:worker?Boolean(this.env.STUDIO_WORKER_TOKEN):Boolean(this.env.HEYGEN_API_KEY),ffmpeg:this.mediaReady,prices:worker?{currency:'USD',providerCharge:0,hosting:'Railway usage'}:prices,targetSeconds:30,nativeResolution:worker?'Worker generated':'1080p',outputResolution:'1080 × 1920',aspectRatio:'9:16',layoutVersion,detectorVersion,rulesHash,appearanceRulesHash,endCardSeconds:3,logoRequired:true,presenterMode:lite?'Approved LiteAvatar trial profile':worker?'Approved local presenter image':'HeyGen Studio Avatar',dailyLimit:worker?null:Number(this.env.DAILY_VIDEO_LIMIT||2)};}
+  async catalog(){await this.ready;const provider=videoProvider(this.env),worker=isWorkerVideoProvider(provider),lite=provider==='liteavatar_worker';return {backend:lite?'Railway CPU · Kokoro + LiteAvatar':worker?'Private worker · Kokoro + SadTalker':'HeyGen',provider,configured:worker?Boolean(this.env.STUDIO_WORKER_TOKEN):Boolean(this.env.HEYGEN_API_KEY),ffmpeg:this.mediaReady,prices:worker?{currency:'USD',providerCharge:0,hosting:'Railway usage'}:prices,targetSeconds:30,nativeResolution:worker?'Worker generated':'1080p',outputResolution:'1080 × 1920',aspectRatio:'9:16',layoutVersion,detectorVersion,rulesHash,appearanceRulesHash,videoCompatibleFromHashes:config.rules.videoCompatibleFromHashes||[],endCardSeconds:3,logoRequired:true,presenterMode:lite?'Approved LiteAvatar trial profile':worker?'Approved local presenter image':'HeyGen Studio Avatar',dailyLimit:worker?null:Number(this.env.DAILY_VIDEO_LIMIT||2)};}
   async library(kind,type='studio_avatar',token=''){
     this.assertHeyGenEnabled();
     if(!['avatars','voices'].includes(kind)||type!=='studio_avatar'||typeof token!=='string'||token.length>2048)error('Use the Studio Avatar library; Photo Avatars are disabled.');
@@ -115,6 +116,9 @@ export class VideoService {
       if(!this.env.HEYGEN_API_KEY)error('Add HEYGEN_API_KEY privately in Railway Variables.');
       await this.media.check();this.mediaReady=true;
       if(action==='render'){
+        // This is the last local gate before a new paid provider request. A
+        // resume skips it because it continues the same saved request.
+        assertFreshPresenterPair(j,this.list().filter(video=>video.id!==j.id));
         await this.ensureLogo(j);
         const look=await this.heygen.look(j.avatar.id);
         if(look?.id!==j.avatar.id||!look.supported_api_engines?.includes('avatar_iv')||(look.status&&look.status!=='completed'))error('The selected presenter is no longer available for Avatar IV. Choose another library presenter.',409);

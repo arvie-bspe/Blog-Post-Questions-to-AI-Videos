@@ -1,11 +1,11 @@
-import {config,rulesHash,appearanceRulesHash} from './rules.mjs';
+import {config,rulesHash,appearanceRulesHash,videoRulesCompatible} from './rules.mjs';
 import {scriptText} from './video-domain.mjs';
 import {requireArticleIdentity} from './article-identity.mjs';
 import {randomUUID} from 'node:crypto';
 import {approved} from './video-domain.mjs';
 import {hash} from './domain.mjs';
 import {prepare} from './heygen-domain.mjs';
-import {choosePresenter,presenterPool} from './presenter-selection.mjs';
+import {assertFreshPresenterPair,choosePresenter,presenterPool} from './presenter-selection.mjs';
 import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
 import {detectorVersion} from './visual-checks.mjs';
 import {queueWorkerVideo} from './local-video.mjs';
@@ -24,7 +24,7 @@ export class ApprovalVideoAutomation {
   }
   profile(parent){
     const row=this.db.prepare('SELECT payload FROM video_automation_profiles WHERE parent=?').get(parent),saved=row?JSON.parse(row.payload):null;
-    if(saved&&(saved.enabled===false||[presenterPool.version,'2026-09-16'].includes(saved.policyVersion)))return saved;
+    if(saved&&(saved.enabled===false||[presenterPool.version,'2026-09-17-liteavatar-cpu-trial','2026-09-16'].includes(saved.policyVersion)))return saved;
     return {id:'automatic-'+presenterPool.version,policyVersion:presenterPool.version,mode:'automatic',enabled:true,parent,maxEstimatedCost:2,authorizedBy:'system',authorizedAt:'2026-09-16',authorization:'Automatic selection and generation begins after an individual script approval.'};
   }
   view(parent){
@@ -99,7 +99,7 @@ export class ApprovalVideoAutomation {
     const paid=matches.filter(j=>j.requests?.video?.id);if(!paid.length)return null;
     const compatible=paid.filter(j=>!presenterIssue(j.avatar,j.voice));
     const expectedRules=parent.mode==='direct_google'?appearanceRulesHash:rulesHash;
-    const current=compatible.find(j=>j.layoutVersion===config.video.layoutVersion&&j.detectorVersion===detectorVersion&&j.source.rulesHash===expectedRules&&hash(j.client)===hash(parent.client)&&hash(j.articleIdentity)===hash(requireArticleIdentity(parent.doc,parent.plan.articleIdentity))&&j.endCard?.targetUrl===parent.row.pageUrl);
+    const current=compatible.find(j=>j.layoutVersion===config.video.layoutVersion&&j.detectorVersion===detectorVersion&&videoRulesCompatible(j.source.rulesHash,expectedRules)&&hash(j.client)===hash(parent.client)&&hash(j.articleIdentity)===hash(requireArticleIdentity(parent.doc,parent.plan.articleIdentity))&&j.endCard?.targetUrl===parent.row.pageUrl);
     if(current){
       if(current.approvalHash!==approvalHash){
         current.approvalHistory=[...(current.approvalHistory||[]),{approvalHash:current.approvalHash,rulesHash:current.source.rulesHash,reviews:current.reviews,at:now()}];
@@ -138,11 +138,12 @@ export class ApprovalVideoAutomation {
       if(!service.env.HEYGEN_API_KEY)throw new Error('HEYGEN_API_KEY is missing. Add it privately in Railway; this question approval can continue afterward.');
       await service.ready;
       const profile=entry.profile,index=entry.index;
+      const reserved=this.db.prepare('SELECT payload FROM video_approval_queue').all().map(row=>JSON.parse(row.payload)).filter(run=>run.id!==entry.id&&['queued','working'].includes(run.status)&&run.selection).map(run=>run.selection);
       if(!entry.selection){
-        const reserved=this.view(parent.id).runs.filter(r=>r.id!==entry.id&&r.selection).map(r=>r.selection);
         entry.selection=profile.mode==='manual_override'?{avatar:profile.avatar,voice:profile.voice,selection:{method:'admin_override'}}:choosePresenter(parent,index,service.list(),reserved);this.save(entry);
       }
-      const chosen=entry.selection,settings={index,avatarId:chosen.avatar.id,voiceId:chosen.voice.id,presenterAccepted:true,thumbnailTitle:parent.plan.videos[index].thumbnailTitle||topic(parent.plan.videos[index].question),aspectRatio:profile.aspectRatio||'9:16'},planned=prepare(parent,settings,chosen.avatar,chosen.voice);
+      const chosen=entry.selection;assertFreshPresenterPair(chosen,service.list(),reserved);
+      const settings={index,avatarId:chosen.avatar.id,voiceId:chosen.voice.id,presenterAccepted:true,thumbnailTitle:parent.plan.videos[index].thumbnailTitle||topic(parent.plan.videos[index].question),aspectRatio:profile.aspectRatio||'9:16'},planned=prepare(parent,settings,chosen.avatar,chosen.voice);
       if(planned.renderEstimate>profile.maxEstimatedCost)throw new Error(`Question ${index+1} is estimated at $${planned.renderEstimate.toFixed(2)}, above the $${profile.maxEstimatedCost.toFixed(2)} allowance.`);
       service.avatars.set(chosen.avatar.id,chosen.avatar);service.voices.set(chosen.voice.id,chosen.voice);
       const j=await service.create(parent.id,settings,profile.authorizedBy);entry.videos=[j.id];this.save(entry);

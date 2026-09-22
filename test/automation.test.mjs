@@ -35,6 +35,13 @@ test('one approval submits only its question; repeated approval and resume canno
   assert.throws(()=>h.service.automation.enqueue(h.parent.id,'Keziah'),/specific question/);assert.throws(()=>h.service.automation.enqueue(h.parent.id,'Keziah',1),/review/);
   h.service.automation.enqueue(h.parent.id,'Keziah',0);await h.service.automation.run(entry);await settle(h);assert.equal(h.submissions.length,1);
   h.approve(1);h.service.automation.enqueue(h.parent.id,'Keziah',1);await settle(h);assert.equal(h.submissions.length,2);assert.equal(h.service.automation.view(h.parent.id).runs.length,2);
+  const paid=h.service.list().filter(video=>video.requests?.video?.submittedAt);assert.equal(paid.length,2);assert.notEqual(paid[0].avatar.id,paid[1].avatar.id);assert.notEqual(paid[0].voice.id,paid[1].voice.id);
+ }finally{h.close();}
+});
+test('a fixed manual override cannot silently repeat its avatar or voice on a second paid render',async()=>{
+ const h=harness();try{
+  h.service.automation.configure(h.parent.id,settings,'Arvie');h.approve(0);h.service.automation.enqueue(h.parent.id,'Keziah',0);await settle(h);assert.equal(h.submissions.length,1);
+  h.approve(1);h.service.automation.enqueue(h.parent.id,'Keziah',1);await settle(h);const run=h.service.automation.view(h.parent.id).lastRun;assert.equal(h.submissions.length,1);assert.equal(run.status,'blocked');assert.match(run.error,/ROTATION_UNAVAILABLE/);
  }finally{h.close();}
 });
 test('an approved question with no automation run is exposed for one guarded recovery',async()=>{

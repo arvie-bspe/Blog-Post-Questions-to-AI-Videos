@@ -5,11 +5,12 @@ import {hash} from './domain.mjs';
 import {visualSettings} from './portrait-media.mjs';
 import {approved,scriptText} from './video-domain.mjs';
 import {layoutVersion,endCardData,detectorVersion} from './visual-checks.mjs';
-import {rulesHash,appearanceRulesHash} from './rules.mjs';
+import {rulesHash,appearanceRulesHash,videoRulesCompatible} from './rules.mjs';
 import {prepare as prepareHeyGen,captionCase} from './heygen-domain.mjs';
 import {requireArticleIdentity} from './article-identity.mjs';
 import {recordQuestionReview} from './question-approval.mjs';
 import {matchingPresenter} from './presenter-compatibility.mjs';
+import {assertFreshPresenterPair,choosePresenter} from './presenter-selection.mjs';
 import {queueLocalReplacement,queueWorkerVideo} from './local-video.mjs';
 import {isWorkerVideoProvider,videoProvider} from './workflow-config.mjs';
 import {permittedPresenterGender} from './article-identity.mjs';
@@ -45,7 +46,7 @@ export class VideoRevisions{
       if(old.provider!=='heygen'&&!isWorkerVideoProvider(old.provider)||!old.files.original||!old.files.voice)fail('Existing source footage and speech are required for a layout rebuild.');
       const pair=matchingPresenter(old.avatar,old.voice);
       const expectedRules=parent.mode==='direct_google'?appearanceRulesHash:rulesHash;
-      if(old.layoutVersion===layoutVersion&&old.detectorVersion===detectorVersion&&old.source.rulesHash===expectedRules)fail('This video already uses the current layout and framing checks. Use Request changes for another correction.');
+      if(old.layoutVersion===layoutVersion&&old.detectorVersion===detectorVersion&&videoRulesCompatible(old.source.rulesHash,expectedRules))fail('This video already uses the current layout and framing checks. Use Request changes for another correction.');
       const workerRequest=old.provider==='liteavatar_worker'?old.requests?.liteavatar:old.requests?.local;
       if(old.provider==='heygen'&&old.requests?.video?.state!=='completed'||isWorkerVideoProvider(old.provider)&&workerRequest?.state!=='completed')fail('The existing generation task must be complete before rebuilding its footage.');
       await s.checkFresh(parent,old.index);
@@ -120,9 +121,10 @@ export class VideoRevisions{
       }
       s.assertHeyGenEnabled();
       if(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate)fail('Accept the displayed generation estimate before creating a replacement.');
-      let voice=body.voiceId?s.voices.get(body.voiceId):j.voice;if(!voice)fail('Select an available English voice from the library.');
-      voice=matchingPresenter(j.avatar,voice).voice;
-      const replacement={...structuredClone(j),id:randomUUID(),identity:hash([j.id,'requested_replacement',j.revisionRequest.at]),voice:{id:voice.id,name:voice.name,language:voice.language,gender:voice.gender},previousVideoId:j.id,generationVersion:(j.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,authorization:null,automation:null};
+      const parent=s.store.get(j.parentId),previous=[{avatar:j.avatar,voice:j.voice}],chosen=choosePresenter(parent,j.index,s.list(),previous);
+      if(body.voiceId){const requested=s.voices.get(body.voiceId);if(!requested)fail('Select an available English voice from the library.');chosen.voice=matchingPresenter(chosen.avatar,requested).voice;}
+      assertFreshPresenterPair(chosen,s.list(),previous);
+      const replacement={...structuredClone(j),id:randomUUID(),identity:hash([j.id,'requested_replacement',j.revisionRequest.at]),avatar:{...chosen.avatar},voice:{...chosen.voice},selection:{...chosen.selection,method:'reviewer_paid_replacement'},previousVideoId:j.id,generationVersion:(j.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,authorization:null,automation:null};
       s.save(replacement);j.status='changes_requested';j.revisionRequest.status='replacement_prepared';j.revisionRequest.replacementId=replacement.id;s.save(j);
       try{await s.start(replacement.id,'render',{acceptCost:true,acceptedEstimate:replacement.renderEstimate},actor);j.revisionRequest.status='replacement_started';s.save(j);}catch(e){replacement.error=e.message;s.save(replacement);}
       return s.get(replacement.id);

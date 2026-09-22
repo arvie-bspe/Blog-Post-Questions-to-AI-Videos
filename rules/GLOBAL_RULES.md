@@ -1,6 +1,6 @@
 # Article Video Studio — Global Rules
 
-Version 1.4.4 · Updated September 21, 2026
+Version 1.4.5 · Updated September 22, 2026
 
 ## Active sources and workflow
 
@@ -33,9 +33,13 @@ Historic article-wide decisions stay in history and are not converted into indiv
 
 Macy also reviews each finished video independently. Approval saves only that video and its associated files to the row's Visual folder. Her request for script changes returns only that video's question to Keziah. Per-question approval overrides any article-wide approval wording in the source documents below.
 
-## Matching avatar and voice — user update September 16, 2026
+## Matching and rotating avatar and voice — user updates September 16 and 22, 2026
 
-The avatar and voiceover must have the same gender on every video. Match verified HeyGen catalog metadata; never infer gender from a name, photo or audio sample. If either gender is unknown or the pair does not match, hold generation before any paid submission. This check applies to automatic selection, manual overrides, saved setups, retries and replacements. Rotation is allowed within the compatible voice pool; a client does not receive a permanent avatar/voice pairing.
+The avatar and voiceover must have the same gender on every video. Match verified HeyGen catalog metadata; never infer gender from a name, photo or audio sample. If either gender is unknown or the pair does not match, hold generation before any paid submission. This check applies to automatic selection, manual overrides, saved setups, retries and replacements.
+
+Every new paid HeyGen render must use both a different Studio Avatar person and a different voice from the most recent paid render. Apply this rule across clients, automatic selection, manual overrides and paid replacements; a paid replacement must also differ from the video it replaces. For simultaneous pending renders, reserve both choices so two pending renders do not receive the same avatar person or voice. Prefer compatible choices that have not yet been used, then select the globally least recently used choices. Do not silently reuse either the most recent avatar person or the most recent voice. If a compatible different avatar or voice is unavailable, hold before paid submission until the approved pool is expanded.
+
+Continuing status checks for the same HeyGen request and rebuilding the Railway layout from already purchased footage are continuations of the original render. They retain the original avatar and voice and do not count as new paid renders.
 
 Existing mismatched footage cannot pass video review or delivery. Correct it using matching, previously purchased footage only if the exact approved script and article still match; otherwise prepare an explicitly authorized paid replacement. Preserving a previous voice on regeneration never overrides this matching requirement.
 

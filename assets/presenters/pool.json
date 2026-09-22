@@ -1,7 +1,7 @@
 {
-  "version": "2026-09-17-liteavatar-cpu-trial",
+  "version": "2026-09-22-heygen-avatar-voice-rotation-v2",
   "selectedBy": "Codex at Arvie request",
-  "verifiedAt": "2026-09-16",
+  "verifiedAt": "2026-09-22",
   "avatars": [
     {
       "id": "local-studio-presenter-01",
@@ -39,6 +39,55 @@
       "personKey": "Brandon"
     },
     {
+      "id": "Bojan_sitting_businesstraining_front",
+      "name": "Bojan Sitting Business Training Front",
+      "gender": "male",
+      "type": "studio_avatar",
+      "personKey": "Bojan"
+    },
+    {
+      "id": "Fernando_sitting_businessindoor_front",
+      "name": "Fernando Sitting Business Indoor Front",
+      "gender": "male",
+      "type": "studio_avatar",
+      "personKey": "Fernando"
+    },
+    {
+      "id": "Patrizio_standing_businesstraining_front",
+      "name": "Patrizio Standing Business Training Front",
+      "gender": "male",
+      "type": "studio_avatar",
+      "personKey": "Patrizio"
+    },
+    {
+      "id": "Vince_standing_businesstraining_front",
+      "name": "Vince Standing Business Training Front",
+      "gender": "male",
+      "type": "studio_avatar",
+      "personKey": "Vince"
+    },
+    {
+      "id": "Artur_standing_office_front",
+      "name": "Artur Standing Office Front",
+      "gender": "male",
+      "type": "studio_avatar",
+      "personKey": "Artur"
+    },
+    {
+      "id": "Raul_Sitting_businesssofa_front_close",
+      "name": "Raul Sitting Business Sofa Front",
+      "gender": "male",
+      "type": "studio_avatar",
+      "personKey": "Raul"
+    },
+    {
+      "id": "Ren_sitting_sofabusiness_front",
+      "name": "Ren Sitting Sofa Business Front",
+      "gender": "male",
+      "type": "studio_avatar",
+      "personKey": "Ren"
+    },
+    {
       "id": "Caroline_Business_Sitting_Front_public",
       "name": "Caroline Business Sitting Front",
       "gender": "female",
@@ -51,6 +100,13 @@
       "gender": "female",
       "type": "studio_avatar",
       "personKey": "Annie"
+    },
+    {
+      "id": "Amelia_sitting_business_training_front",
+      "name": "Amelia Sitting Business Training Front",
+      "gender": "female",
+      "type": "studio_avatar",
+      "personKey": "Amelia"
     }
   ],
   "voices": [
@@ -88,7 +144,63 @@
       "language": "English",
       "gender": "male",
       "type": "heygen_voice"
+    },
+    {
+      "id": "4e79dcb0af2c4d07a5bf5db075884257",
+      "name": "Araj - Clear & Professional",
+      "language": "English",
+      "gender": "male",
+      "type": "heygen_voice"
+    },
+    {
+      "id": "0e2ff5b962084420879e076a2345d13f",
+      "name": "Edmund - Firm & Measured",
+      "language": "English",
+      "gender": "male",
+      "type": "heygen_voice"
+    },
+    {
+      "id": "1811504ae1f64bd68e9fb7f2557fea23",
+      "name": "Leif - Firm & Measured",
+      "language": "English",
+      "gender": "male",
+      "type": "heygen_voice"
+    },
+    {
+      "id": "65ec2e63a15745d4afc8bf996e107fa2",
+      "name": "Rupert - Clear & Professional",
+      "language": "English",
+      "gender": "male",
+      "type": "heygen_voice"
+    },
+    {
+      "id": "04cfb01cb3a845c2af192666c417d1ed",
+      "name": "Cerys - Bright & Energetic",
+      "language": "English",
+      "gender": "female",
+      "type": "heygen_voice"
+    },
+    {
+      "id": "077965bf3e2d4634bb9aea3b60c62a62",
+      "name": "Serena - Bright & Energetic",
+      "language": "English",
+      "gender": "female",
+      "type": "heygen_voice"
+    },
+    {
+      "id": "44c2584dd48f46b7bce9b66c8bf086e",
+      "name": "Faye - Conversational",
+      "language": "English",
+      "gender": "female",
+      "type": "heygen_voice"
+    },
+    {
+      "id": "405f88d3faf2485e97ba8460b7b62efd",
+      "name": "Juniper - Bright & Energetic",
+      "language": "English",
+      "gender": "female",
+      "type": "heygen_voice"
     }
   ],
-  "metadataSource": "HeyGen public API catalog and manually reviewed LiteAvatar trial profiles; verified September 17, 2026"
+  "metadataSource": "HeyGen public API catalog and manually reviewed LiteAvatar trial profiles; HeyGen rotation pool reverified September 22, 2026"
 }

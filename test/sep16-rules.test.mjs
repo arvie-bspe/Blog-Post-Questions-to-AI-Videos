@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {inspect,withClientSelection,validatePlan} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {requireArticleIdentity,presenterGender} from '../src/article-identity.mjs';
-import {choosePresenter,presenterPool} from '../src/presenter-selection.mjs';
+import {assertFreshPresenterPair,choosePresenter,paidPresenterHistory,presenterPool} from '../src/presenter-selection.mjs';
 import {Store} from '../src/store.mjs';
 import {ScriptWorkflow} from '../src/script-workflow.mjs';
 import {adoptSourceIdentity} from '../src/source-records.mjs';
@@ -27,15 +27,18 @@ test('article identity requires article evidence and never falls back to a direc
 test('presenter selection respects explicit blurb information and rotates people within a batch',()=>{
  const parent={id:'test',client:{key:'Paul'},doc,plan};
  assert.equal(presenterGender(doc,plan.presenterContext),'male');
- assert.equal(choosePresenter(parent,0).avatar.gender,'male');
+ const maleFirst=choosePresenter(parent,0),maleSecond=choosePresenter(parent,1,[],[maleFirst]);assert.equal(maleFirst.avatar.gender,'male');assert.notEqual(maleSecond.avatar.personKey,maleFirst.avatar.personKey);assert.notEqual(maleSecond.voice.id,maleFirst.voice.id);
  assert.equal(presenterGender(doc,{gender:'female',lawyerBlurbParagraphIds:[]}),null);
  const unknown={...parent,plan:{...plan,presenterContext:{gender:'unspecified',lawyerBlurbParagraphIds:[]}}};
  const first=choosePresenter(unknown,0),second=choosePresenter(unknown,1,[],[first]);
- assert.notEqual(first.avatar.personKey,second.avatar.personKey);
- const history=[{client:parent.client,avatar:first.avatar,requests:{video:{id:'paid-once'}},created:new Date().toISOString()}];
- assert.notEqual(choosePresenter(unknown,0,history).avatar.personKey,first.avatar.personKey);
+ assert.notEqual(first.avatar.personKey,second.avatar.personKey);assert.notEqual(first.voice.id,second.voice.id);
+ const history=[{client:{key:'Different client'},avatar:first.avatar,voice:first.voice,requests:{video:{id:'paid-once',submittedAt:'2026-09-22T10:00:00Z'}},created:'2026-09-22T10:00:00Z'}];
+ const rotated=choosePresenter(unknown,0,history);assert.notEqual(rotated.avatar.personKey,first.avatar.personKey);assert.notEqual(rotated.voice.id,first.voice.id);assert.doesNotThrow(()=>assertFreshPresenterPair(rotated,history));assert.throws(()=>assertFreshPresenterPair(first,history),/different avatar/);
  assert.deepEqual(choosePresenter(unknown,0),first);
  assert.ok(presenterPool.voices.some(v=>v.id===first.voice.id));
+ const rebuild={...history[0],id:'free-layout-copy',created:'2026-09-22T11:00:00Z'};assert.equal(paidPresenterHistory([history[0],rebuild]).length,1);
+ const onePair={version:'one-pair-test',avatars:[{id:'only-avatar',personKey:'Only Person',name:'Only',type:'studio_avatar',gender:'male'}],voices:[{id:'only-voice',name:'Only Voice',type:'heygen_voice',gender:'male'}]};
+ const only=choosePresenter(parent,0,[],[],onePair),used=[{avatar:only.avatar,voice:only.voice,requests:{video:{id:'only-paid',submittedAt:'2026-09-22T12:00:00Z'}}}];assert.throws(()=>choosePresenter(parent,1,used,[],onePair),/ROTATION_UNAVAILABLE/);
 });
 test('H4 and lawyer-hiring topics are excluded; FAQ evidence must independently come from main H2/H3 content',()=>{
  const p=(text,namedStyleType,startIndex)=>({text,namedStyleType,startIndex});

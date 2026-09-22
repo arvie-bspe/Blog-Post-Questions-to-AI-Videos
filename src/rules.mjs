@@ -8,6 +8,7 @@ const section=(start,end)=>rules.slice(rules.indexOf(start),rules.indexOf(end));
 export const globalContent=section('### C01','### C32')+section('### C33','## Complete video appearance');
 export const appearanceRules=rules.slice(rules.indexOf('## Complete video appearance'));
 export const appearanceRulesHash=hash(appearanceRules);
+export const videoRulesCompatible=(saved,expected)=>saved===expected||config.rules.videoCompatibleFromHashes?.includes(saved)===true;
 export function clientRules(key){
   const scope=section('### C32','### C33');
   const names=['Davies','John','Dan','Alia','Ticket Crushers','Gibson and Singleton','Russell Chicago'];

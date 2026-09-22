@@ -18,6 +18,7 @@ import {preparedExample} from '../src/sample.mjs';
 import {finishWorkerVideo} from '../src/local-video.mjs';
 import {fixture} from './fixture-data.mjs';
 import {scriptPolicyHash} from '../src/workflow-config.mjs';
+import {presenterPool} from '../src/presenter-selection.mjs';
 function parent(store){
   const source=fixture('paul'),row=parseMonthly(fixture('monthly')).find(r=>r.documentId===source.documentId),client=selectClient(parseClients(fixture('clients')),row.clientKey),doc=inspect(source,row.titleHint);
   const j=store.create({identity:'test',doc,row,client,rulesHash,rulesVersion:config.version,mode:'saved_snapshot'});
@@ -169,7 +170,9 @@ test('unknown HeyGen submission survives restart and cannot buy a duplicate; dai
     assert.equal(h.service.get(j.id).status,'needs_reconciliation');assert.equal(h.service.get(j.id).requests.video.idempotencyKey,j.id);assert.equal(submits,1);
     h.service.closed=true;const restarted=new VideoService({store:h.store,env:{HEYGEN_API_KEY:'fake',DAILY_VIDEO_LIMIT:'1'},dataDir:h.dir,checkFresh:async()=>{},local:true,media:{check:async()=>true},heygen:{look:async()=>avatar}});
     try{await assert.rejects(restarted.start(j.id,'resume',{},'Arvie'),/cannot be resumed/);assert.equal(submits,1);}finally{restarted.closed=true;}
-    const next=await h.service.create(h.parent.id,{...hgSettings,index:1},'Arvie');h.service.closed=false;await assert.rejects(h.service.start(next.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie'),/daily/);assert.equal(submits,1);
+    const alternateAvatar={id:'public_presenter_2',name:'TEST second library presenter',type:'studio_avatar',gender:'male',supported_api_engines:['avatar_iv'],status:'completed'},alternateVoice={id:'public_voice_2',name:'TEST second English voice',language:'English',gender:'male'};
+    h.service.avatars.set(alternateAvatar.id,alternateAvatar);h.service.voices.set(alternateVoice.id,alternateVoice);h.service.heygen.look=async id=>id===alternateAvatar.id?alternateAvatar:avatar;
+    const next=await h.service.create(h.parent.id,{...hgSettings,index:1,avatarId:alternateAvatar.id,voiceId:alternateVoice.id},'Arvie');h.service.closed=false;await assert.rejects(h.service.start(next.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie'),/daily/);assert.equal(submits,1);
   }finally{h.close();}
 });
 
@@ -238,9 +241,10 @@ test('Macy free-text requests remain pending and script requests return to conte
 test('Macy paid replacement requires cost acceptance and preserves the older video',async()=>{
   let submits=0;const h=harness({heygen:{submit:async()=>{submits++;return {id:'mock-replacement',state:'waiting'};},status:async()=>({status:'completed'})}});
   try{
+    h.service.heygen.look=async id=>({...presenterPool.avatars.find(item=>item.id===id),supported_api_engines:['avatar_iv'],status:'completed'});
     const initial=await h.service.create(h.parent.id,hgSettings,'Arvie'),saved=h.service.get(initial.id);saved.status='visual_review';saved.files.video=true;saved.detectorVersion=config.video.faceDetectorVersion;h.service.save(saved);
     await assert.rejects(h.service.review(initial.id,{decision:'reject',note:'The speaking motion needs another render.',changeType:'render'},'Macy'),/cost/);assert.equal(submits,0);
-    const next=await h.service.review(initial.id,{decision:'reject',note:'The speaking motion needs another render.',changeType:'render',acceptCost:true,acceptedEstimate:2},'Macy');await idle(h.service,next.id);assert.notEqual(next.id,initial.id);assert.equal(h.service.get(next.id).previousVideoId,initial.id);assert.equal(h.service.get(initial.id).status,'changes_requested');assert.equal(submits,1);
+    const next=await h.service.review(initial.id,{decision:'reject',note:'The speaking motion needs another render.',changeType:'render',acceptCost:true,acceptedEstimate:2},'Macy');await idle(h.service,next.id);assert.notEqual(next.id,initial.id);assert.notEqual(next.avatar.id,initial.avatar.id);assert.notEqual(next.voice.id,initial.voice.id);assert.equal(h.service.get(next.id).previousVideoId,initial.id);assert.equal(h.service.get(initial.id).status,'changes_requested');assert.equal(submits,1);
     await assert.rejects(h.service.review(initial.id,{decision:'reject',note:'The speaking motion needs another render.',changeType:'render',acceptCost:true,acceptedEstimate:2},'Macy'),/completed render/);assert.equal(submits,1);
   }finally{h.close();}
 });
