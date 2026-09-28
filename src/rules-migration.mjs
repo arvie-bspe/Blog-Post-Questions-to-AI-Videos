@@ -21,7 +21,7 @@ export function reconcileRules(store){
     else job.status='inspected';
     if(!preserveApproval&&(job.auditRequired===true||/^(?:OpenAI API|Local Codex worker|Claude API) draft\b/i.test(job.origin||'')))job.audit={passed:false,issues:['The content rules changed. Run a fresh source audit before approving this draft.']};
     if(visualOnly){job.history.at(-1).reason='Appearance-only update. Existing script and content decisions preserved.';job.layoutNotice='The current layout rules apply to regenerated videos. Existing videos need the updated layout and a fresh video review.';}
-    else if(approvalCompatible){job.history.at(-1).reason='Future-render workflow update. Existing scripts, approvals and videos preserved.';job.layoutNotice='Avatar and voice rotation applies to future paid renders. Existing scripts, approvals and videos are unchanged.';job.error=null;}
+    else if(approvalCompatible){job.history.at(-1).reason='Future-render workflow update. Existing scripts, approvals and videos preserved.';job.layoutNotice='Professional attire, suitable voice pairings and avatar/voice rotation apply to future paid renders. Existing scripts, approvals and videos are unchanged.';job.error=null;}
     else job.error='Global rules were updated. The saved script is unchanged; a script reviewer must review it under the current rules before video generation.';
     if(perQuestion){job.layoutNotice='Approval is now per question. Review each script card separately. Existing paid videos are kept and can be reused after the matching question is approved.';job.error=null;}
     store.db.exec('BEGIN IMMEDIATE');

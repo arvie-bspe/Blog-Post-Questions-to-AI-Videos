@@ -1,6 +1,6 @@
 # Article Video Studio — Global Rules
 
-Version 1.4.5 · Updated September 22, 2026
+Version 1.4.6 · Updated September 28, 2026
 
 ## Active sources and workflow
 
@@ -32,6 +32,16 @@ Review notes, change requests, approval fingerprints, generation status and dupl
 Historic article-wide decisions stay in history and are not converted into individual approvals or replayed as generation requests. Previously purchased footage is retained and reused after a matching individual approval when the exact script, source, identity and layout still match. Only an explicit new paid-render action can purchase a replacement of an existing submitted request.
 
 Macy also reviews each finished video independently. Approval saves only that video and its associated files to the row's Visual folder. Her request for script changes returns only that video's question to Keziah. Per-question approval overrides any article-wide approval wording in the source documents below.
+
+## Professional presenter and suitable voice — user update September 28, 2026
+
+Every new paid render must use a professional-looking generic presenter wearing a business suit or blazer. Do not use T-shirts, polos, casual shirts, or shirt-only casual looks. Inspect the actual provider preview before admitting a look to the approved pool; a catalog label containing “business” does not establish suitable clothing. A collared shirt or blouse under a suit jacket or blazer is acceptable.
+
+The voiceover must fit the selected avatar's professional persona, apparent age presentation, tone and speaking style, as well as matching verified gender metadata. Use natural, clear, conversational delivery. Avoid a conspicuously deep, booming, theatrical or otherwise mismatched voice. Review the visual preview, provider voice description and audio sample when approving a pairing; do not randomly combine every same-gender voice and avatar. Acoustic pitch screening can help select a lighter voice but cannot replace human playback review of naturalness and persona fit.
+
+Automatic selection, manual setups and paid replacements must use explicitly reviewed avatar/voice pairings from the approved pool. If no suitable pair also satisfies rotation, hold generation before spending. Do not loosen clothing or persona requirements to obtain another render. Macy's final video review must check professional attire and whether the voice sounds natural for that presenter.
+
+This update applies to future paid renders. Preserve existing scripts, Keziah approvals and historical videos; do not regenerate or repurchase existing footage automatically. An explicitly requested presenter or voice correction creates one new paid replacement while retaining the old video for history.
 
 ## Matching and rotating avatar and voice — user updates September 16 and 22, 2026
 

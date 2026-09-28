@@ -58,8 +58,8 @@ test('real FFmpeg composition retains audio duration, captions, contacts, thumbn
   }finally{rmSync(dir,{recursive:true,force:true});}
 });
 
-const avatar={id:'public_presenter',name:'TEST library presenter',type:'studio_avatar',gender:'male',supported_api_engines:['avatar_iv'],status:'completed'};
-const voice={id:'public_voice',name:'TEST English voice',language:'English',gender:'male'};
+const avatar={...presenterPool.avatars.find(a=>a.professionalReview?.approved&&a.gender==='male'),supported_api_engines:['avatar_iv'],status:'completed'};
+const voice=presenterPool.voices.find(v=>v.id===avatar.professionalReview.allowedVoiceIds[0]);
 const hgSettings={index:0,avatarId:avatar.id,voiceId:voice.id,presenterAccepted:true,thumbnailTitle:'Support Letters for Your Appeal'};
 function shortParent(store){const j=parent(store);j.plan.videos.forEach(v=>v.sentences=v.sentences.slice(0,1));approveFixture(j);store.save(j);return j;}
 function harness({heygen={},media={check:async()=>true},limit=2,env={HEYGEN_API_KEY:'fake-test-key'}}={}){
@@ -78,6 +78,20 @@ test('mismatched manual profiles and saved setups cannot consume the daily allow
   const j=await h.service.create(h.parent.id,hgSettings,'Arvie'),saved=h.service.get(j.id);saved.voice=female;h.service.save(saved);
   await assert.rejects(h.service.start(j.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie'),/GENDER_MISMATCH/);
   assert.deepEqual(h.service.get(j.id).requests,{});assert.equal(h.store.db.prepare('SELECT count(*) AS n FROM video_spend').get().n,0);
+ }finally{h.close();}
+});
+
+test('casual manual profiles and stale prepared setups are blocked before allowance consumption or provider submission',async()=>{
+ let submits=0;const h=harness({heygen:{submit:async()=>{submits++;throw new Error('must not submit');}}});try{
+  const casual=presenterPool.avatars.find(a=>a.id==='Patrizio_standing_businesstraining_front');
+  assert.throws(()=>h.service.automation.configure(h.parent.id,{enabled:true,avatarId:casual.id,voiceId:voice.id,acceptCost:true,maxEstimatedCost:2},'Arvie'),/ATTIRE_UNAPPROVED/);
+  await assert.rejects(h.service.create(h.parent.id,{...hgSettings,avatarId:casual.id},'Arvie'),/ATTIRE_UNAPPROVED/);
+  const j=await h.service.create(h.parent.id,hgSettings,'Arvie'),saved=h.service.get(j.id);saved.avatar=casual;h.service.save(saved);
+  await assert.rejects(h.service.start(j.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie'),/ATTIRE_UNAPPROVED/);
+  await assert.rejects(h.service.queued(saved),/ATTIRE_UNAPPROVED/);
+  assert.deepEqual(h.service.get(j.id).requests,{});assert.equal(h.store.db.prepare('SELECT count(*) AS n FROM video_spend').get().n,0);assert.equal(submits,0);
+  saved.requests.video={id:'historical-paid',state:'processing'};h.service.save(saved);h.service.heygen.status=async id=>{assert.equal(id,'historical-paid');return {status:'completed'};};
+  assert.equal((await h.service.queued(saved)).status,'completed');assert.equal(submits,0);
  }finally{h.close();}
 });
 
@@ -177,7 +191,7 @@ test('unknown HeyGen submission survives restart and cannot buy a duplicate; dai
     assert.equal(h.service.get(j.id).status,'needs_reconciliation');assert.equal(h.service.get(j.id).requests.video.idempotencyKey,j.id);assert.equal(submits,1);
     h.service.closed=true;const restarted=new VideoService({store:h.store,env:{HEYGEN_API_KEY:'fake',DAILY_VIDEO_LIMIT:'1'},dataDir:h.dir,checkFresh:async()=>{},local:true,media:{check:async()=>true},heygen:{look:async()=>avatar}});
     try{await assert.rejects(restarted.start(j.id,'resume',{},'Arvie'),/cannot be resumed/);assert.equal(submits,1);}finally{restarted.closed=true;}
-    const alternateAvatar={id:'public_presenter_2',name:'TEST second library presenter',type:'studio_avatar',gender:'male',supported_api_engines:['avatar_iv'],status:'completed'},alternateVoice={id:'public_voice_2',name:'TEST second English voice',language:'English',gender:'male'};
+    const alternateAvatar={...presenterPool.avatars.find(a=>a.professionalReview?.approved&&a.gender==='male'&&a.id!==avatar.id),supported_api_engines:['avatar_iv'],status:'completed'},alternateVoice=presenterPool.voices.find(v=>v.id!==voice.id&&alternateAvatar.professionalReview.allowedVoiceIds.includes(v.id));
     h.service.avatars.set(alternateAvatar.id,alternateAvatar);h.service.voices.set(alternateVoice.id,alternateVoice);h.service.heygen.look=async id=>id===alternateAvatar.id?alternateAvatar:avatar;
     const next=await h.service.create(h.parent.id,{...hgSettings,index:1,avatarId:alternateAvatar.id,voiceId:alternateVoice.id},'Arvie');h.service.closed=false;await assert.rejects(h.service.start(next.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie'),/daily/);assert.equal(submits,1);
   }finally{h.close();}
@@ -245,6 +259,20 @@ test('Macy free-text requests remain pending and script requests return to conte
     let handedOff;h.service.onScriptChanges=async(id,note)=>{handedOff={id,note};};await h.service.revisions.apply(j.id,{changeType:'script'},'Macy');assert.equal(handedOff.id,h.parent.id);assert.match(handedOff.note,/easier/);assert.equal(h.store.get(h.parent.id).status,'partially_reviewed');
   }finally{h.close();}
 });
+test('an explicit professional replacement keeps the approved script and landscape output and purchases only once',async()=>{
+ let submits=0;const h=harness({heygen:{submit:async body=>{submits++;assert.equal(body.avatar_id,'Fernando_sitting_businessindoor_front');assert.equal(body.voice_id,'7aed81d30cd4462da310a0e6b9c64791');return {id:'professional-replacement',state:'waiting'};},status:async()=>({status:'completed'})}});
+ try{
+  h.service.heygen.look=async id=>({...presenterPool.avatars.find(a=>a.id===id),supported_api_engines:['avatar_iv'],status:'completed'});
+  const initial=await h.service.create(h.parent.id,{...hgSettings,aspectRatio:'16:9'},'Arvie'),saved=h.service.get(initial.id);
+  saved.avatar=presenterPool.avatars.find(a=>a.id==='Patrizio_standing_businesstraining_front');saved.voice=presenterPool.voices.find(v=>v.id==='0e2ff5b962084420879e076a2345d13f');saved.status='visual_review';saved.files.video=true;saved.detectorVersion=config.video.faceDetectorVersion;saved.requests.video={id:'old-paid-request',state:'completed',submittedAt:'2026-09-28T10:00:00Z'};h.service.save(saved);
+  const parentBefore=h.store.get(h.parent.id),body={decision:'reject',note:'Please replace the casual presenter and overly deep voice.',changeType:'render',acceptCost:true,acceptedEstimate:2,avatarId:'Fernando_sitting_businessindoor_front',voiceId:'7aed81d30cd4462da310a0e6b9c64791'};
+  const replacement=await h.service.review(initial.id,body,'Arvie');await idle(h.service,replacement.id);
+  assert.equal(submits,1);assert.equal(replacement.script,saved.script);assert.deepEqual(replacement.format,saved.format);assert.equal(replacement.format.aspectRatio,'16:9');assert.equal(replacement.approvalHash,saved.approvalHash);assert.equal(replacement.personaFit.attire,'suit_or_blazer');assert.equal(replacement.previousVideoId,initial.id);
+  assert.deepEqual(h.store.get(h.parent.id).questionReviews,parentBefore.questionReviews);assert.deepEqual(h.store.get(h.parent.id).plan,parentBefore.plan);assert.equal(h.service.get(initial.id).requests.video.id,'old-paid-request');
+  await assert.rejects(h.service.review(initial.id,body,'Arvie'),/completed render/);assert.equal(submits,1);
+ }finally{h.close();}
+});
+
 test('Macy paid replacement requires cost acceptance and preserves the older video',async()=>{
   let submits=0;const h=harness({heygen:{submit:async()=>{submits++;return {id:'mock-replacement',state:'waiting'};},status:async()=>({status:'completed'})}});
   try{

@@ -9,7 +9,7 @@ import {rulesHash,appearanceRulesHash,videoRulesCompatible} from './rules.mjs';
 import {prepare as prepareHeyGen,captionCase} from './heygen-domain.mjs';
 import {requireArticleIdentity} from './article-identity.mjs';
 import {recordQuestionReview} from './question-approval.mjs';
-import {matchingPresenter} from './presenter-compatibility.mjs';
+import {matchingPresenter,professionalPresenter,presenterPool} from './presenter-compatibility.mjs';
 import {assertFreshPresenterPair,choosePresenter} from './presenter-selection.mjs';
 import {queueLocalReplacement,queueWorkerVideo} from './local-video.mjs';
 import {isWorkerVideoProvider,videoProvider} from './workflow-config.mjs';
@@ -121,10 +121,19 @@ export class VideoRevisions{
       }
       s.assertHeyGenEnabled();
       if(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate)fail('Accept the displayed generation estimate before creating a replacement.');
-      const parent=s.store.get(j.parentId),previous=[{avatar:j.avatar,voice:j.voice}],chosen=choosePresenter(parent,j.index,s.list(),previous);
-      if(body.voiceId){const requested=s.voices.get(body.voiceId);if(!requested)fail('Select an available English voice from the library.');chosen.voice=matchingPresenter(chosen.avatar,requested).voice;}
+      const parent=s.store.get(j.parentId),previous=[{avatar:j.avatar,voice:j.voice},...[...s.active].filter(id=>id!==j.id).map(id=>s.get(id))];
+      let chosen;
+      if(body.avatarId){
+        if(!body.voiceId)fail('Choose the professional presenter and compatible voice together.');
+        const avatar=s.avatars.get(body.avatarId)||presenterPool.avatars.find(a=>a.id===body.avatarId),voice=s.voices.get(body.voiceId)||presenterPool.voices.find(v=>v.id===body.voiceId);
+        chosen={...professionalPresenter(avatar,voice),selection:{method:'reviewer_selected_professional_pair',poolVersion:presenterPool.version}};
+      }else{
+        chosen=choosePresenter(parent,j.index,s.list(),previous);
+        if(body.voiceId){const requested=s.voices.get(body.voiceId)||presenterPool.voices.find(v=>v.id===body.voiceId);Object.assign(chosen,professionalPresenter(chosen.avatar,requested));}
+      }
       assertFreshPresenterPair(chosen,s.list(),previous);
       const replacement={...structuredClone(j),id:randomUUID(),identity:hash([j.id,'requested_replacement',j.revisionRequest.at]),avatar:{...chosen.avatar},voice:{...chosen.voice},selection:{...chosen.selection,method:'reviewer_paid_replacement'},previousVideoId:j.id,generationVersion:(j.generationVersion||1)+1,created:now(),createdBy:actor,status:'prepared',stage:null,error:null,requests:{},files:{},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,authorization:null,automation:null};
+      replacement.personaFit=professionalPresenter(replacement.avatar,replacement.voice).personaFit;
       s.save(replacement);j.status='changes_requested';j.revisionRequest.status='replacement_prepared';j.revisionRequest.replacementId=replacement.id;s.save(j);
       try{await s.start(replacement.id,'render',{acceptCost:true,acceptedEstimate:replacement.renderEstimate},actor);j.revisionRequest.status='replacement_started';s.save(j);}catch(e){replacement.error=e.message;s.save(replacement);}
       return s.get(replacement.id);

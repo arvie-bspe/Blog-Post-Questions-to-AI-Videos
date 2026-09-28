@@ -7,6 +7,7 @@ if(rulesHash!==config.rules.sha256)throw new Error('Global rules checksum change
 const section=(start,end)=>rules.slice(rules.indexOf(start),rules.indexOf(end));
 export const globalContent=section('### C01','### C32')+section('### C33','## Complete video appearance');
 export const appearanceRules=rules.slice(rules.indexOf('## Complete video appearance'));
+export const presenterRules=section('## Professional presenter and suitable voice','## Presenter gender selection');
 export const appearanceRulesHash=hash(appearanceRules);
 export const videoRulesCompatible=(saved,expected)=>saved===expected||config.rules.videoCompatibleFromHashes?.includes(saved)===true;
 export function clientRules(key){

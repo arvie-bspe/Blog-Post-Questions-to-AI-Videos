@@ -1,12 +1,12 @@
 {
-  "version": "1.4.5",
+  "version": "1.4.6",
   "status": "active_replacement",
-  "verifiedAt": "2026-09-22",
+  "verifiedAt": "2026-09-28",
   "rules": {
     "contentSections": 36,
     "appearanceSections": 100,
     "master": "GLOBAL_RULES.md",
-    "sha256": "a3ef84e1fced737c2f855c8273109e157e9f5ff7f542621559c6fe8bfe8ac0bc",
+    "sha256": "cf316b2d12b2be73faba882e14a906170c69ed306ed51b9e3e8d3c93be0b2757",
     "visualOnlyFromHashes": [
       "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd",
       "384bfd991956eba3eb39d3c8bfb7ad68c5cf0a11d078480e0344c42d6c7d4bdc",
@@ -16,12 +16,14 @@
       "deea6ce91ea2cadd559a6b49e9ad02dca60fcbb5537b72cb0283317ee37e4b36"
     ],
     "approvalCompatibleFromHashes": [
-      "537bca81bf9b57d2aac4063c426b00232d7ceb9c24555e18af550f403b7b12ea"
+      "537bca81bf9b57d2aac4063c426b00232d7ceb9c24555e18af550f403b7b12ea",
+      "a3ef84e1fced737c2f855c8273109e157e9f5ff7f542621559c6fe8bfe8ac0bc"
     ],
     "videoCompatibleFromHashes": [
       "deea6ce91ea2cadd559a6b49e9ad02dca60fcbb5537b72cb0283317ee37e4b36",
       "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd",
-      "537bca81bf9b57d2aac4063c426b00232d7ceb9c24555e18af550f403b7b12ea"
+      "537bca81bf9b57d2aac4063c426b00232d7ceb9c24555e18af550f403b7b12ea",
+      "a3ef84e1fced737c2f855c8273109e157e9f5ff7f542621559c6fe8bfe8ac0bc"
     ]
   },
   "sources": {
@@ -201,6 +203,20 @@
         "thumbnail",
         "end_card"
       ]
+    },
+    "professionalPresenter": {
+      "required": true,
+      "attire": "suit_or_blazer",
+      "excluded": [
+        "t_shirt",
+        "polo",
+        "casual_shirt",
+        "shirt_only_casual_look"
+      ],
+      "voicePersonaFitRequired": true,
+      "selection": "reviewed_avatar_voice_pairs",
+      "finalPlaybackReviewRequired": true,
+      "appliesTo": "new_paid_renders"
     }
   },
   "workflow": {

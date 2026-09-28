@@ -1,7 +1,7 @@
 {
-  "version": "2026-09-22-heygen-avatar-voice-rotation-v2",
+  "version": "2026-09-28-professional-persona-v1",
   "selectedBy": "Codex at Arvie request",
-  "verifiedAt": "2026-09-22",
+  "verifiedAt": "2026-09-28",
   "avatars": [
     {
       "id": "local-studio-presenter-01",
@@ -36,77 +36,242 @@
       "name": "Brandon Business Sitting Front",
       "gender": "male",
       "type": "studio_avatar",
-      "personKey": "Brandon"
+      "personKey": "Brandon",
+      "professionalReview": {
+        "approved": true,
+        "reviewedAt": "2026-09-28",
+        "attire": "suit_or_blazer",
+        "description": "Dark business suit jacket over a light collared shirt.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/4fd0dacf93e74e9ea1c8f9029bf16b25_56470/preview_talk_1.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [
+          "513b14b431b64a578c467c480dd0a9c3",
+          "6bfd37c3e336434b918877e66dc78203"
+        ],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Bojan_sitting_businesstraining_front",
       "name": "Bojan Sitting Business Training Front",
       "gender": "male",
       "type": "studio_avatar",
-      "personKey": "Bojan"
+      "personKey": "Bojan",
+      "professionalReview": {
+        "approved": false,
+        "reviewedAt": "2026-09-28",
+        "attire": "excluded",
+        "description": "Not approved for new renders under the suit/blazer dress code.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/391d7595784140d0b627958c1c93aff1_39290/preview_talk_2.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Fernando_sitting_businessindoor_front",
       "name": "Fernando Sitting Business Indoor Front",
       "gender": "male",
       "type": "studio_avatar",
-      "personKey": "Fernando"
+      "personKey": "Fernando",
+      "professionalReview": {
+        "approved": true,
+        "reviewedAt": "2026-09-28",
+        "attire": "suit_or_blazer",
+        "description": "Dark business suit, light shirt and tie.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/203425112ca0467990d1b2327ab394b6_39010/preview_talk_5.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [
+          "6bfd37c3e336434b918877e66dc78203",
+          "7aed81d30cd4462da310a0e6b9c64791"
+        ],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Patrizio_standing_businesstraining_front",
       "name": "Patrizio Standing Business Training Front",
       "gender": "male",
       "type": "studio_avatar",
-      "personKey": "Patrizio"
+      "personKey": "Patrizio",
+      "professionalReview": {
+        "approved": false,
+        "reviewedAt": "2026-09-28",
+        "attire": "excluded",
+        "description": "Not approved for new renders under the suit/blazer dress code.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/46c6e9fe736d40d4bf8b89baafede4a5_38860/preview_talk_1.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Vince_standing_businesstraining_front",
       "name": "Vince Standing Business Training Front",
       "gender": "male",
       "type": "studio_avatar",
-      "personKey": "Vince"
+      "personKey": "Vince",
+      "professionalReview": {
+        "approved": false,
+        "reviewedAt": "2026-09-28",
+        "attire": "excluded",
+        "description": "Not approved for new renders under the suit/blazer dress code.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/0734f4397d5d45b380befb3aa5e22366_38890/preview_talk_3.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Artur_standing_office_front",
       "name": "Artur Standing Office Front",
       "gender": "male",
       "type": "studio_avatar",
-      "personKey": "Artur"
+      "personKey": "Artur",
+      "professionalReview": {
+        "approved": true,
+        "reviewedAt": "2026-09-28",
+        "attire": "suit_or_blazer",
+        "description": "Dark business suit jacket over a light collared shirt.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/ea847ee0ca44468fb6119d16396bf8f1_37890/preview_target.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [
+          "513b14b431b64a578c467c480dd0a9c3",
+          "6bfd37c3e336434b918877e66dc78203"
+        ],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Raul_Sitting_businesssofa_front_close",
       "name": "Raul Sitting Business Sofa Front",
       "gender": "male",
       "type": "studio_avatar",
-      "personKey": "Raul"
+      "personKey": "Raul",
+      "professionalReview": {
+        "approved": false,
+        "reviewedAt": "2026-09-28",
+        "attire": "excluded",
+        "description": "Not approved for new renders under the suit/blazer dress code.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/f27279aef6934f7684abc2f73dd38bfd_38820/preview_talk_1.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Ren_sitting_sofabusiness_front",
       "name": "Ren Sitting Sofa Business Front",
       "gender": "male",
       "type": "studio_avatar",
-      "personKey": "Ren"
+      "personKey": "Ren",
+      "professionalReview": {
+        "approved": true,
+        "reviewedAt": "2026-09-28",
+        "attire": "suit_or_blazer",
+        "description": "Dark business suit jacket over a light collared shirt.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/21d6f432bc3a44baa5fb2612d1f4e600_37570/preview_talk_1.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [
+          "6bfd37c3e336434b918877e66dc78203",
+          "7aed81d30cd4462da310a0e6b9c64791"
+        ],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Caroline_Business_Sitting_Front_public",
       "name": "Caroline Business Sitting Front",
       "gender": "female",
       "type": "studio_avatar",
-      "personKey": "Caroline"
+      "personKey": "Caroline",
+      "professionalReview": {
+        "approved": false,
+        "reviewedAt": "2026-09-28",
+        "attire": "excluded",
+        "description": "Not approved for new renders under the suit/blazer dress code.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/75e4f326918c45028fe06bc9dc0c45da_56520/preview_talk_2.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Annie_Office_Sitting_Front_public",
       "name": "Annie Office Sitting Front",
       "gender": "female",
       "type": "studio_avatar",
-      "personKey": "Annie"
+      "personKey": "Annie",
+      "professionalReview": {
+        "approved": true,
+        "reviewedAt": "2026-09-28",
+        "attire": "suit_or_blazer",
+        "description": "Black business blazer over a dark blouse.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/b5272572b25143fbb1af3b874a03bdaf_56020/preview_talk_2.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [
+          "6567750df960424fb6556202d7206640",
+          "44c2584dd48f46b7bce9b66c8bf086e0"
+        ],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     },
     {
       "id": "Amelia_sitting_business_training_front",
       "name": "Amelia Sitting Business Training Front",
       "gender": "female",
       "type": "studio_avatar",
-      "personKey": "Amelia"
+      "personKey": "Amelia",
+      "professionalReview": {
+        "approved": false,
+        "reviewedAt": "2026-09-28",
+        "attire": "excluded",
+        "description": "Not approved for new renders under the suit/blazer dress code.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/0233ba6aea01411ab07ddafbf97886f2_39260/preview_talk_2.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
+    },
+    {
+      "id": "Georgia_sitting_office_front",
+      "name": "Georgia Office Front",
+      "gender": "female",
+      "type": "studio_avatar",
+      "personKey": "Georgia",
+      "professionalReview": {
+        "approved": true,
+        "reviewedAt": "2026-09-28",
+        "attire": "suit_or_blazer",
+        "description": "Black business blazer over a blue blouse.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/26c9a98335d7429da6ed3215d961e080_39190/preview_target.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [
+          "6567750df960424fb6556202d7206640",
+          "44c2584dd48f46b7bce9b66c8bf086e0"
+        ],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
+    },
+    {
+      "id": "Martina_sitting_office_front",
+      "name": "Martina Office Front",
+      "gender": "female",
+      "type": "studio_avatar",
+      "personKey": "Martina",
+      "professionalReview": {
+        "approved": true,
+        "reviewedAt": "2026-09-28",
+        "attire": "suit_or_blazer",
+        "description": "Black business blazer over a white blouse.",
+        "previewUrl": "https://files2.heygen.ai/avatar/v3/9712d1bcebed4c5d9869d36af796a532_38090/preview_target.webp",
+        "personaProfile": "adult_professional",
+        "allowedVoiceIds": [
+          "6567750df960424fb6556202d7206640",
+          "44c2584dd48f46b7bce9b66c8bf086e0"
+        ],
+        "basis": "Visible provider preview, catalog gender and voice style, and acoustic sample screening. Macy confirms natural persona fit at final playback review."
+      }
     }
   ],
   "voices": [
@@ -136,7 +301,14 @@
       "name": "Renata - Clear & Professional",
       "language": "English",
       "gender": "female",
-      "type": "heygen_voice"
+      "type": "heygen_voice",
+      "persona": {
+        "style": "professional",
+        "profile": "adult_professional",
+        "previewUrl": "https://resource2.heygen.ai/text_to_speech/public-voice-curation/6567750df960424fb6556202d7206640/id=906bf2e3-1a64-47db-81ed-e7ae6743339d.wav",
+        "screenedAt": "2026-09-28",
+        "screening": "Provider English/gender/style metadata and acoustic pitch analysis; final suitability requires human playback review."
+      }
     },
     {
       "id": "02052ba42f3d4d50a809b964bb8b1b94",
@@ -200,7 +372,63 @@
       "language": "English",
       "gender": "female",
       "type": "heygen_voice"
+    },
+    {
+      "id": "513b14b431b64a578c467c480dd0a9c3",
+      "name": "Brandon",
+      "language": "English",
+      "gender": "male",
+      "type": "heygen_voice",
+      "persona": {
+        "style": "professional",
+        "profile": "adult_professional",
+        "previewUrl": "https://resource2.heygen.ai/text_to_speech/21e28514b7994f46b907b74914a3ca6e/513b14b431b64a578c467c480dd0a9c3/id=aadc7f5d-6c2c-499a-be12-aa884c12fb5c.wav",
+        "screenedAt": "2026-09-28",
+        "screening": "Provider English/gender/style metadata and acoustic pitch analysis; final suitability requires human playback review."
+      }
+    },
+    {
+      "id": "6bfd37c3e336434b918877e66dc78203",
+      "name": "Thaddeus - Conversational & Easygoing",
+      "language": "English",
+      "gender": "male",
+      "type": "heygen_voice",
+      "persona": {
+        "style": "conversational",
+        "profile": "adult_professional",
+        "previewUrl": "https://resource2.heygen.ai/text_to_speech/public-voice-curation/6bfd37c3e336434b918877e66dc78203/id=4169f60e-2eb9-4d4f-a057-c66d125fd98f.wav",
+        "screenedAt": "2026-09-28",
+        "screening": "Provider English/gender/style metadata and acoustic pitch analysis; final suitability requires human playback review."
+      }
+    },
+    {
+      "id": "7aed81d30cd4462da310a0e6b9c64791",
+      "name": "Henry - Warm & Friendly",
+      "language": "English",
+      "gender": "male",
+      "type": "heygen_voice",
+      "persona": {
+        "style": "warm_friendly",
+        "profile": "adult_professional",
+        "previewUrl": "https://resource2.heygen.ai/text_to_speech/public-voice-curation/7aed81d30cd4462da310a0e6b9c64791/id=07d52863-1ad0-430e-9519-7e497c17820a.wav",
+        "screenedAt": "2026-09-28",
+        "screening": "Provider English/gender/style metadata and acoustic pitch analysis; final suitability requires human playback review."
+      }
+    },
+    {
+      "id": "44c2584dd48f46b7bce9b66c8bf086e0",
+      "name": "Faye - Conversational & Easygoing",
+      "language": "English",
+      "gender": "female",
+      "type": "heygen_voice",
+      "persona": {
+        "style": "conversational",
+        "profile": "adult_professional",
+        "previewUrl": "https://resource2.heygen.ai/text_to_speech/public-voice-curation/44c2584dd48f46b7bce9b66c8bf086e0/id=16af47ec-7d39-49fa-9dd9-b10388faeb22.wav",
+        "screenedAt": "2026-09-28",
+        "screening": "Provider English/gender/style metadata and acoustic pitch analysis; final suitability requires human playback review."
+      }
     }
   ],
-  "metadataSource": "HeyGen public API catalog and manually reviewed LiteAvatar trial profiles; HeyGen rotation pool reverified September 22, 2026"
+  "metadataSource": "Authenticated HeyGen catalog; clothing visually reviewed September 28, 2026. New renders use only reviewed suit/blazer looks and explicitly compatible voices."
 }

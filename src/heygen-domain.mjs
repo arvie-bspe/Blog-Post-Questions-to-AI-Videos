@@ -3,7 +3,7 @@ import {hash} from './domain.mjs';
 import {approved,scriptText} from './video-domain.mjs';
 import {endCardData,layoutVersion} from './visual-checks.mjs';
 import {requireArticleIdentity} from './article-identity.mjs';
-import {matchingPresenter} from './presenter-compatibility.mjs';
+import {professionalPresenter} from './presenter-compatibility.mjs';
 import {directMode,scriptTargetSeconds} from './workflow-config.mjs';
 
 export const prices={checked:'2026-09-15',currency:'USD',engine:'avatar_iv',photoPerMinute:3,studioPerMinute:4,source:'https://help.heygen.com/en/articles/10060327-heygen-api-pricing-explained'};
@@ -22,7 +22,7 @@ export function prepare(job,body,avatar,voice){
   if(!Number.isInteger(index)||!video)throw new Error('Choose an approved question.');
   if(!avatar||avatar.type!=='studio_avatar')throw new Error('Choose a speaking Studio Avatar from the HeyGen public library. Photo Avatars are disabled.');
   if(!voice)throw new Error('Choose a voice from the HeyGen English library.');
-  ({avatar,voice}=matchingPresenter(avatar,voice));
+  const pair=professionalPresenter(avatar,voice);({avatar,voice}=pair);
   if(body.presenterAccepted!==true)throw new Error('Confirm the selected HeyGen presenter and voice.');
   const title=String(body.thumbnailTitle||'').trim();
   if(title.length>80||title.split(/\s+/).length<3||title.split(/\s+/).length>6||/[{}\\\r\n<>]/.test(title))throw new Error('Use a thumbnail topic of 3 to 6 words without special markup.');
@@ -34,7 +34,7 @@ export function prepare(job,body,avatar,voice){
   if(text.length>7000)throw new Error('This script exceeds the supported video request size.');
   if([text,articleIdentity.name,articleIdentity.address,articleIdentity.phone].some(t=>typeof t!=='string'||!t.trim()||/[{}\\<>\x00-\x08]/.test(t)))throw new Error('Script or contact details are missing or contain unsupported markup.');
   const avatarSnapshot={id:avatar.id,name:avatar.name,type:avatar.type,personKey:avatar.personKey,gender:avatar.gender},voiceSnapshot={id:voice.id,name:voice.name,language:voice.language,gender:voice.gender};
-  return {provider:'heygen',sourceFraming,layoutVersion,endCard,articleIdentity,parentId:job.id,index,approvalHash,script:text,scriptHash:hash(text),question:video.question,thumbnailTitle:title,avatar:avatarSnapshot,voice:voiceSnapshot,
+  return {provider:'heygen',sourceFraming,layoutVersion,endCard,articleIdentity,parentId:job.id,index,approvalHash,script:text,scriptHash:hash(text),question:video.question,thumbnailTitle:title,avatar:avatarSnapshot,voice:voiceSnapshot,personaFit:pair.personaFit,
     client:job.client,source:{documentUrl:job.row.documentUrl,sourceHash:job.doc.sourceHash,mode:job.mode,rulesHash:activeRulesHash,folderUrl:job.row.folderUrl},
     models:{video:'heygen/avatar_iv'},format,logoRequired:true,outputRevision:1,prices,targetSeconds,wordCount,runtimeReason:video.runtimeReason||'',estimatedSeconds:Math.max(targetSeconds,Math.ceil(wordCount/2.2)),renderEstimate:estimate(avatar.type,Math.max(targetSeconds,Math.ceil(wordCount/2.2))),
     identity:hash(['heygen/avatar_iv',job.id,index,approvalHash,avatarSnapshot,voiceSnapshot,title,targetSeconds,format.aspectRatio,config.version,activeRulesHash,sourceFraming.version]),status:'prepared',requests:{},files:{},reviews:[]};

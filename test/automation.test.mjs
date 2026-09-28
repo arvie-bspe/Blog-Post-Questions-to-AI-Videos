@@ -14,8 +14,8 @@ import {presenterPath} from '../src/media.mjs';
 import {VideoService} from '../src/video-service.mjs';
 import {presenterPool} from '../src/presenter-selection.mjs';
 import {fixture} from './fixture-data.mjs';
-const avatar={id:'mock_studio',name:'Mock speaking presenter',type:'studio_avatar',gender:'male',supported_api_engines:['avatar_iv'],status:'completed'};
-const voice={id:'mock_voice',name:'Mock English voice',language:'English',gender:'male'};
+const avatar={...presenterPool.avatars.find(a=>a.professionalReview?.approved&&a.gender==='male'),supported_api_engines:['avatar_iv'],status:'completed'};
+const voice=presenterPool.voices.find(v=>v.id===avatar.professionalReview.allowedVoiceIds[0]);
 const settings={enabled:true,avatarId:avatar.id,voiceId:voice.id,maxEstimatedCost:2,acceptCost:true};
 function harness(key='mock-key'){
   const dir=mkdtempSync(join(tmpdir(),'approval-video-')),store=new Store(join(dir,'db')),submissions=[];
@@ -26,6 +26,15 @@ function harness(key='mock-key'){
   return {dir,store,parent,service,submissions,approve(index=0){approveFixture(parent,index);store.save(parent);},close(){service.closed=true;store.close();rmSync(dir,{recursive:true,force:true});}};
 }
 async function settle(h){for(let i=0;i<200;i++){await new Promise(r=>setTimeout(r,5));if(!h.service.automation.active.size&&!h.service.active.size)return;}assert.fail('Mock automation did not settle.');}
+
+test('professional pool updates preserve existing manual profile authorization and allowance',()=>{
+ const h=harness();try{
+  h.service.automation.configure(h.parent.id,{...settings,maxEstimatedCost:5},'Arvie');
+  const profile={...h.service.automation.profile(h.parent.id),policyVersion:'2026-09-22-heygen-avatar-voice-rotation-v2'};
+  h.store.db.prepare('UPDATE video_automation_profiles SET payload=? WHERE parent=?').run(JSON.stringify(profile),h.parent.id);
+  assert.deepEqual(h.service.automation.profile(h.parent.id),profile);
+ }finally{h.close();}
+});
 
 test('one approval submits only its question; repeated approval and resume cannot submit its sibling',async()=>{
  const h=harness();try{

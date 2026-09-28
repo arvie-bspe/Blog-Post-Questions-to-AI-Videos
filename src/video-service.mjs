@@ -10,7 +10,7 @@ import {prepare,prices,estimate,requestBody,subtitles,sourceFraming} from './hey
 import {HeyGen,providerId} from './heygen.mjs';
 import {mediaTools,durationOf,compose} from './media.mjs';
 import {layoutVersion,detectorVersion} from './visual-checks.mjs';
-import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
+import {matchingPresenter,presenterIssue,professionalPresenter,presenterPool} from './presenter-compatibility.mjs';
 import {assertFreshPresenterPair} from './presenter-selection.mjs';
 import {applyLocalVideoTask,finishWorkerVideo,retryWorkerVideo} from './local-video.mjs';
 import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
@@ -97,7 +97,7 @@ export class VideoService {
   async create(parentId,body,actor){
     this.assertHeyGenEnabled();
     const parent=this.store.get(parentId);approved(parent,body.index);await this.checkFresh(parent,body.index);
-    const data=prepare(this.store.get(parentId),body,this.avatars.get(body.avatarId),this.voices.get(body.voiceId));
+    const data=prepare(this.store.get(parentId),body,this.avatars.get(body.avatarId)||presenterPool.avatars.find(a=>a.id===body.avatarId),this.voices.get(body.voiceId)||presenterPool.voices.find(v=>v.id===body.voiceId));
     const existing=this.db.prepare('SELECT payload FROM videos WHERE identity=?').get(data.identity);if(existing)return publicJob(JSON.parse(existing.payload));
     const j={...data,id:randomUUID(),created:now(),createdBy:actor,presenterAcceptedAt:now()};this.save(j);this.store.record(parentId,actor,'prepare_heygen_video');return publicJob(j);
   }
@@ -118,6 +118,7 @@ export class VideoService {
       if(action==='render'){
         // This is the last local gate before a new paid provider request. A
         // resume skips it because it continues the same saved request.
+        j.personaFit=professionalPresenter(j.avatar,j.voice).personaFit;
         const reserved=[...this.active].filter(activeId=>activeId!==j.id).map(activeId=>this.get(activeId));
         assertFreshPresenterPair(j,this.list().filter(video=>video.id!==j.id),reserved);
         await this.ensureLogo(j);
@@ -138,7 +139,10 @@ export class VideoService {
     let request=j.requests.video;
     if(request?.state==='submitting'&&!request.id)throw new Error('Submission outcome is unknown. Check HeyGen using this setup ID; do not resubmit.');
     if(!request){
-      await this.validate(j);if(j.automation)this.automation.assertAuthorization(j.parentId,j.automation);j.requests.video={state:'submitting',submittedAt:now(),idempotencyKey:j.id};this.save(j);
+      await this.validate(j);if(j.automation)this.automation.assertAuthorization(j.parentId,j.automation);
+      j.personaFit=professionalPresenter(j.avatar,j.voice).personaFit;
+      assertFreshPresenterPair(j,this.list().filter(video=>video.id!==j.id),[...this.active].filter(id=>id!==j.id).map(id=>this.get(id)));
+      j.requests.video={state:'submitting',submittedAt:now(),idempotencyKey:j.id};this.save(j);
       const result=await this.heygen.submit(requestBody(j),j.id);j.requests.video={...j.requests.video,...result};this.save(j);
     }
     request=j.requests.video;const deadline=Date.now()+30*60*1000;

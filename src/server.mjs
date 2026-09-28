@@ -3,7 +3,7 @@ import {readFileSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {Store} from './store.mjs';
-import {config,rules,appearanceRules,appearanceRulesHash,rulesHash} from './rules.mjs';
+import {config,rules,appearanceRules,presenterRules,appearanceRulesHash,rulesHash} from './rules.mjs';
 import {parseMonthly,parseClients,selectClient,inspect,recordIdentity,hash,validatePlan,validateForJob,googleId} from './domain.mjs';
 import {preparedExample} from './sample.mjs';
 import {analyze} from './ai.mjs';
@@ -126,7 +126,7 @@ export function createApp(env=process.env){
       }
       if(req.method==='GET'&&path==='/api/client-profiles')return send(res,200,(await clientProfiles()).map(c=>({key:c.key,name:c.name,homepage:c.homepage,address:c.address,phone:c.phone})));
       if(req.method==='GET'&&path==='/api/worker-status')return send(res,200,{configured:workerConfigured(env),queued:store.db.prepare("SELECT count(*) n FROM worker_tasks WHERE status='queued'").get().n,working:store.db.prepare("SELECT count(*) n FROM worker_tasks WHERE status='working'").get().n,workers:tasks.workers()});
-      if(req.method==='GET'&&path==='/api/rules')return send(res,200,{appearanceRules,scriptPolicy:{version:scriptPolicyVersion,summary:'The AI independently reviews the selected Google Doc tab, may use or formulate source-supported questions, preserves material qualifications, and cites article evidence for every answer sentence. The retired Video Content and Script Rules are not used for new direct-document jobs.'},version:workflowVersion});
+      if(req.method==='GET'&&path==='/api/rules')return send(res,200,{appearanceRules,presenterRules,scriptPolicy:{version:scriptPolicyVersion,summary:'The AI independently reviews the selected Google Doc tab, may use or formulate source-supported questions, preserves material qualifications, and cites article evidence for every answer sentence. The retired Video Content and Script Rules are not used for new direct-document jobs.'},version:workflowVersion});
       if(req.method==='POST'&&path==='/api/inspect'){
         const body=await json(req);let source,mode;
         if(body.mode==='live_google'){source=await liveSource(body.sheetName,Number(body.rowNumber));mode='live_google';}

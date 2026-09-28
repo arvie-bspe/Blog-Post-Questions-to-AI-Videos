@@ -7,6 +7,7 @@ import {inspect,withClientSelection,validatePlan} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {requireArticleIdentity,presenterGender} from '../src/article-identity.mjs';
 import {assertFreshPresenterPair,choosePresenter,paidPresenterHistory,presenterPool} from '../src/presenter-selection.mjs';
+import {professionalPresenter} from '../src/presenter-compatibility.mjs';
 import {Store} from '../src/store.mjs';
 import {ScriptWorkflow} from '../src/script-workflow.mjs';
 import {adoptSourceIdentity} from '../src/source-records.mjs';
@@ -37,9 +38,26 @@ test('presenter selection respects explicit blurb information and rotates people
  assert.deepEqual(choosePresenter(unknown,0),first);
  assert.ok(presenterPool.voices.some(v=>v.id===first.voice.id));
  const rebuild={...history[0],id:'free-layout-copy',created:'2026-09-22T11:00:00Z'};assert.equal(paidPresenterHistory([history[0],rebuild]).length,1);
- const onePair={version:'one-pair-test',avatars:[{id:'only-avatar',personKey:'Only Person',name:'Only',type:'studio_avatar',gender:'male'}],voices:[{id:'only-voice',name:'Only Voice',type:'heygen_voice',gender:'male'}]};
+ const onePair={version:'one-pair-test',avatars:[{...maleFirst.avatar,professionalReview:{...maleFirst.avatar.professionalReview,allowedVoiceIds:[maleFirst.voice.id]}}],voices:[maleFirst.voice]};
  const only=choosePresenter(parent,0,[],[],onePair),used=[{avatar:only.avatar,voice:only.voice,requests:{video:{id:'only-paid',submittedAt:'2026-09-22T12:00:00Z'}}}];assert.throws(()=>choosePresenter(parent,1,used,[],onePair),/ROTATION_UNAVAILABLE/);
 });
+test('professional selections require reviewed clothing and a specific voice pairing; client metadata cannot bypass the pool',()=>{
+ const fernando=presenterPool.avatars.find(a=>a.id==='Fernando_sitting_businessindoor_front'),henry=presenterPool.voices.find(v=>v.id==='7aed81d30cd4462da310a0e6b9c64791'),edmund=presenterPool.voices.find(v=>v.id==='0e2ff5b962084420879e076a2345d13f');
+ assert.equal(professionalPresenter(fernando,henry).personaFit.attire,'suit_or_blazer');
+ assert.throws(()=>professionalPresenter(fernando,edmund),/PERSONA_MISMATCH/);
+ assert.throws(()=>professionalPresenter({...fernando,id:'Patrizio_standing_businesstraining_front'},henry),/ATTIRE_UNAPPROVED/);
+ assert.throws(()=>professionalPresenter({...fernando,id:'unreviewed-avatar'},henry),/ATTIRE_UNAPPROVED/);
+ const parent={id:'professional',doc,plan};let previous=[];
+ for(let i=0;i<20;i++){
+  const chosen=choosePresenter(parent,i,previous),review=presenterPool.avatars.find(a=>a.id===chosen.avatar.id).professionalReview;
+  assert.equal(review.approved,true);assert.ok(review.allowedVoiceIds.includes(chosen.voice.id));assert.notEqual(chosen.voice.id,edmund.id);
+  previous=[{...chosen,requests:{video:{id:'paid-'+i,submittedAt:'2026-09-28T12:00:00Z'}}}];
+ }
+ const restricted={...presenterPool,avatars:presenterPool.avatars.filter(a=>['Fernando','Brandon'].includes(a.personKey))};
+ const selected=choosePresenter(parent,0,[],[{voice:henry},{voice:presenterPool.voices.find(v=>v.id==='6bfd37c3e336434b918877e66dc78203')}],restricted);
+ assert.equal(selected.avatar.personKey,'Brandon');
+});
+
 test('H4 and lawyer-hiring topics are excluded; FAQ evidence must independently come from main H2/H3 content',()=>{
  const p=(text,namedStyleType,startIndex)=>({text,namedStyleType,startIndex});
  const d=withClientSelection(inspect({title:'Source',paragraphs:[p('Source','HEADING_1',1),p('What proof is needed?','HEADING_2',2),p('Signed records provide proof of the event.','NORMAL_TEXT',3),p('What secondary rule applies?','HEADING_4',4),p('A minor subheading detail.','NORMAL_TEXT',5),p('Do I need a lawyer?','HEADING_2',6),p('Speak with a lawyer.','NORMAL_TEXT',7),p('Frequently Asked Questions','HEADING_2',8),p('How do records help?','HEADING_3',9),p('FAQ-only discussion of the topic.','NORMAL_TEXT',10)]}),'Sample');

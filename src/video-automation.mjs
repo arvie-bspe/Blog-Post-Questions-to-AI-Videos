@@ -6,7 +6,7 @@ import {approved} from './video-domain.mjs';
 import {hash} from './domain.mjs';
 import {prepare} from './heygen-domain.mjs';
 import {assertFreshPresenterPair,choosePresenter,presenterPool} from './presenter-selection.mjs';
-import {matchingPresenter,presenterIssue} from './presenter-compatibility.mjs';
+import {professionalPresenter,presenterIssue} from './presenter-compatibility.mjs';
 import {detectorVersion} from './visual-checks.mjs';
 import {queueWorkerVideo} from './local-video.mjs';
 import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
@@ -24,7 +24,7 @@ export class ApprovalVideoAutomation {
   }
   profile(parent){
     const row=this.db.prepare('SELECT payload FROM video_automation_profiles WHERE parent=?').get(parent),saved=row?JSON.parse(row.payload):null;
-    if(saved&&(saved.enabled===false||[presenterPool.version,'2026-09-17-liteavatar-cpu-trial','2026-09-16'].includes(saved.policyVersion)))return saved;
+    if(saved&&(saved.enabled===false||[presenterPool.version,'2026-09-22-heygen-avatar-voice-rotation-v2','2026-09-17-liteavatar-cpu-trial','2026-09-16'].includes(saved.policyVersion)))return saved;
     return {id:'automatic-'+presenterPool.version,policyVersion:presenterPool.version,mode:'automatic',enabled:true,parent,maxEstimatedCost:2,authorizedBy:'system',authorizedAt:'2026-09-16',authorization:'Automatic selection and generation begins after an individual script approval.'};
   }
   view(parent){
@@ -54,9 +54,9 @@ export class ApprovalVideoAutomation {
   configure(parent,body,actor){
     if(!this.service.store.get(parent))fail('Article not found.',404);
     if(body.enabled===false){const previous=this.profile(parent)||{};this.db.prepare('INSERT OR REPLACE INTO video_automation_profiles VALUES(?,?)').run(parent,JSON.stringify({...previous,policyVersion:presenterPool.version,enabled:false,updated:now()}));return this.view(parent);}
-    const avatar=this.service.avatars.get(body.avatarId),voice=this.service.voices.get(body.voiceId),limit=Number(body.maxEstimatedCost);
+    const avatar=this.service.avatars.get(body.avatarId)||presenterPool.avatars.find(a=>a.id===body.avatarId),voice=this.service.voices.get(body.voiceId)||presenterPool.voices.find(v=>v.id===body.voiceId),limit=Number(body.maxEstimatedCost);
     if(!avatar||avatar.type!=='studio_avatar'||!voice)fail('Select a Studio Avatar and English library voice first.');
-    const pair=matchingPresenter(avatar,voice);
+    const pair=professionalPresenter(avatar,voice);
     if(body.acceptCost!==true||!Number.isFinite(limit)||limit<2||limit>12)fail('Accept the estimated automatic generation allowance ($2–$12 per video). Actual duration may change the charge.');
     const profile={id:randomUUID(),policyVersion:presenterPool.version,mode:'manual_override',enabled:true,parent,avatar:{id:avatar.id,name:avatar.name,type:'studio_avatar',gender:pair.avatar.gender},voice:{id:voice.id,name:voice.name,language:voice.language,gender:pair.voice.gender},maxEstimatedCost:limit,authorizedBy:actor,authorizedAt:now()};
     this.db.prepare('INSERT OR REPLACE INTO video_automation_profiles VALUES(?,?)').run(parent,JSON.stringify(profile));
