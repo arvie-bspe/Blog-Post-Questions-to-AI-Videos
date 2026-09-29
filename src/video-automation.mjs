@@ -10,6 +10,7 @@ import {professionalPresenter,presenterIssue} from './presenter-compatibility.mj
 import {detectorVersion} from './visual-checks.mjs';
 import {queueWorkerVideo} from './local-video.mjs';
 import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
+import {permittedPresenterGender} from './article-identity.mjs';
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 const topic=question=>question.replace(/[?{}\\<>:\r\n]/g,'').trim().split(/\s+/).slice(0,6).join(' ');
@@ -52,11 +53,12 @@ export class ApprovalVideoAutomation {
   }
 
   configure(parent,body,actor){
-    if(!this.service.store.get(parent))fail('Article not found.',404);
+    const article=this.service.store.get(parent);if(!article)fail('Article not found.',404);
     if(body.enabled===false){const previous=this.profile(parent)||{};this.db.prepare('INSERT OR REPLACE INTO video_automation_profiles VALUES(?,?)').run(parent,JSON.stringify({...previous,policyVersion:presenterPool.version,enabled:false,updated:now()}));return this.view(parent);}
     const avatar=this.service.avatars.get(body.avatarId)||presenterPool.avatars.find(a=>a.id===body.avatarId),voice=this.service.voices.get(body.voiceId)||presenterPool.voices.find(v=>v.id===body.voiceId),limit=Number(body.maxEstimatedCost);
     if(!avatar||avatar.type!=='studio_avatar'||!voice)fail('Select a Studio Avatar and English library voice first.');
     const pair=professionalPresenter(avatar,voice);
+    permittedPresenterGender(article.doc,article.plan?.presenterContext,pair.avatar.gender);
     if(body.acceptCost!==true||!Number.isFinite(limit)||limit<2||limit>12)fail('Accept the estimated automatic generation allowance ($2–$12 per video). Actual duration may change the charge.');
     const profile={id:randomUUID(),policyVersion:presenterPool.version,mode:'manual_override',enabled:true,parent,avatar:{id:avatar.id,name:avatar.name,type:'studio_avatar',gender:pair.avatar.gender},voice:{id:voice.id,name:voice.name,language:voice.language,gender:pair.voice.gender},maxEstimatedCost:limit,authorizedBy:actor,authorizedAt:now()};
     this.db.prepare('INSERT OR REPLACE INTO video_automation_profiles VALUES(?,?)').run(parent,JSON.stringify(profile));

@@ -86,7 +86,9 @@ Presenter selection follows these rules:
 - If multiple attorneys are represented and all explicitly established genders are female, select an approved female generic presenter.
 - If multiple attorneys are represented and all explicitly established genders are male, select an approved male generic presenter.
 - If attorneys of different explicitly established genders are represented, either an approved male or female generic presenter may be selected.
-- If the lawyer blurb does not contain enough explicit information to establish gender, do not guess or use outside information. Use the default presenter selection behavior.
+- If the lawyer blurb does not contain enough explicit information to establish gender, do not guess, use outside information, or fall back to an unrestricted presenter. Hold video generation before any paid provider request until the source analysis identifies the lawyer blurb and confirms male or female from explicit wording.
+
+This source-gender check is required before automatic selection, a manual setup, a one-time override, or a paid replacement. The selected avatar and voice must both match the male or female gender established by the lawyer blurb. When the blurb explicitly represents both male and female attorneys, either an approved male pair or an approved female pair may be selected. An AI label without supporting lawyer-blurb wording is not sufficient.
 
 Only use gender information found in the lawyer blurb. Do not use other parts of the Google Doc to infer the attorney's gender.
 

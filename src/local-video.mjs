@@ -3,7 +3,7 @@ import {copyFileSync,readFileSync,existsSync} from 'node:fs';
 import {join} from 'node:path';
 import {hash} from './domain.mjs';
 import {approved,scriptText,captions} from './video-domain.mjs';
-import {requireArticleIdentity,presenterGender,permittedPresenterGender} from './article-identity.mjs';
+import {requireArticleIdentity,requirePresenterGender,permittedPresenterGender} from './article-identity.mjs';
 import {endCardData,layoutVersion,detectorVersion} from './visual-checks.mjs';
 import {matchingPresenter,presenterPool} from './presenter-compatibility.mjs';
 import {durationOf} from './media.mjs';
@@ -20,7 +20,7 @@ export const localAvatar=presenterPool.avatars.find(a=>a.id==='local-studio-pres
 export const localVoice=presenterPool.voices.find(v=>v.id==='am_michael');
 
 function workerPresenter(job,index,provider,requestedGender=null){
-  const selected=mode(provider),required=presenterGender(job.doc,job.plan?.presenterContext),target=requestedGender?permittedPresenterGender(job.doc,job.plan?.presenterContext,requestedGender):required,avatars=presenterPool.avatars.filter(a=>a.type===selected.avatarType&&(!target||a.gender===target));
+  const selected=mode(provider),required=requirePresenterGender(job.doc,job.plan?.presenterContext),target=requestedGender?permittedPresenterGender(job.doc,job.plan?.presenterContext,requestedGender):(required==='mixed'?null:required),avatars=presenterPool.avatars.filter(a=>a.type===selected.avatarType&&(!target||a.gender===target));
   const pairs=avatars.flatMap(avatar=>presenterPool.voices.filter(voice=>voice.type==='local_tts'&&voice.gender===avatar.gender).map(voice=>({avatar,voice})));
   const label=provider==='liteavatar_worker'?'LiteAvatar':'local';
   if(!pairs.length)throw new Error(target?`No approved ${label} ${target} presenter and matching voice are configured.`:`No approved ${label} presenter and matching voice are configured.`);

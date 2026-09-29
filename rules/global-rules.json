@@ -1,12 +1,12 @@
 {
-  "version": "1.4.6",
+  "version": "1.4.7",
   "status": "active_replacement",
-  "verifiedAt": "2026-09-28",
+  "verifiedAt": "2026-09-29",
   "rules": {
     "contentSections": 36,
     "appearanceSections": 100,
     "master": "GLOBAL_RULES.md",
-    "sha256": "cf316b2d12b2be73faba882e14a906170c69ed306ed51b9e3e8d3c93be0b2757",
+    "sha256": "a5c929b3656706aa05a16e438d72459dfb4353bc18e051d4e04d3b42bc17e33b",
     "visualOnlyFromHashes": [
       "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd",
       "384bfd991956eba3eb39d3c8bfb7ad68c5cf0a11d078480e0344c42d6c7d4bdc",
@@ -17,13 +17,16 @@
     ],
     "approvalCompatibleFromHashes": [
       "537bca81bf9b57d2aac4063c426b00232d7ceb9c24555e18af550f403b7b12ea",
-      "a3ef84e1fced737c2f855c8273109e157e9f5ff7f542621559c6fe8bfe8ac0bc"
+      "a3ef84e1fced737c2f855c8273109e157e9f5ff7f542621559c6fe8bfe8ac0bc",
+      "cf316b2d12b2be73faba882e14a906170c69ed306ed51b9e3e8d3c93be0b2757"
     ],
     "videoCompatibleFromHashes": [
       "deea6ce91ea2cadd559a6b49e9ad02dca60fcbb5537b72cb0283317ee37e4b36",
       "728f96b8aa4a9c04103b86d77bb4847feb6723939c0d91ee18261f34884aa7dd",
       "537bca81bf9b57d2aac4063c426b00232d7ceb9c24555e18af550f403b7b12ea",
-      "a3ef84e1fced737c2f855c8273109e157e9f5ff7f542621559c6fe8bfe8ac0bc"
+      "a3ef84e1fced737c2f855c8273109e157e9f5ff7f542621559c6fe8bfe8ac0bc",
+      "cf316b2d12b2be73faba882e14a906170c69ed306ed51b9e3e8d3c93be0b2757",
+      "6b87f6fcfbdd16b3f14036a7d4b30e6f94ad6cea7f59a0d38900a3fec99197db"
     ]
   },
   "sources": {
@@ -187,7 +190,7 @@
       "other_google_doc_sections"
     ],
     "mixedExplicitGenderAction": "approved_male_or_female_presenter",
-    "unknownSourceGenderAction": "default_approved_pool_without_gender_requirement",
+    "unknownSourceGenderAction": "hold_before_provider_submission_until_explicit_lawyer_blurb_gender",
     "reviewerGenderCorrection": "new_cpu_render_with_same_gender_voice",
     "unknownGenderAction": "hold_before_paid_submission",
     "faceDetectorVersion": "yunet-2023mar-1",
@@ -217,7 +220,14 @@
       "selection": "reviewed_avatar_voice_pairs",
       "finalPlaybackReviewRequired": true,
       "appliesTo": "new_paid_renders"
-    }
+    },
+    "presenterSourceGenderRequiredForNewRender": true,
+    "presenterGenderCheckAppliesTo": [
+      "automatic_selection",
+      "manual_setup",
+      "one_time_override",
+      "paid_replacement"
+    ]
   },
   "workflow": {
     "approvalTaskTitle": "send for approval to client",

@@ -4,14 +4,16 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {inspect,parseClients,parseMonthly,validatePlan,recordIdentity} from '../src/domain.mjs';
-import {rulesHash,config,rules,clientRules} from '../src/rules.mjs';
+import {rulesHash,config,rules,clientRules,presenterRules} from '../src/rules.mjs';
 import {preparedExample} from '../src/sample.mjs';
 import {Store} from '../src/store.mjs';
 import {reconcileRules} from '../src/rules-migration.mjs';
 import {fixture} from './fixture-data.mjs';
 test('all source sections, Russell-only rules and required logo acquisition survive synchronization',()=>{
-  assert.equal(config.version,'1.4.6');assert.equal(config.workflow.approvalScope,'per_question');assert.equal([...rules.matchAll(/^### C\d{2} /gm)].length,36);
+  assert.equal(config.version,'1.4.7');assert.equal(config.workflow.approvalScope,'per_question');assert.equal([...rules.matchAll(/^### C\d{2} /gm)].length,36);
   assert.equal(config.video.presenterGenderEvidenceSource,'lawyer_blurb_only');assert.equal(config.video.reviewerGenderCorrection,'new_cpu_render_with_same_gender_voice');assert.match(rules,/Only use gender information found in the lawyer blurb/);
+  assert.equal(config.video.presenterSourceGenderRequiredForNewRender,true);assert.match(config.video.unknownSourceGenderAction,/hold_before_provider_submission/);
+  assert.match(presenterRules,/## Presenter gender selection/);assert.match(presenterRules,/Hold video generation before any paid provider request/);
   assert.equal([...rules.matchAll(/^#### C32\.\d /gm)].length,7);assert.equal([...rules.matchAll(/^### V\d{2,3} /gm)].length,100);
   assert.match(clientRules('Russell Chicago'),/source|body/i);assert.doesNotMatch(clientRules('Paul'),/Russell Chicago/);
   assert.match(rules,/persistent caching by domain/);
@@ -21,6 +23,7 @@ test('all source sections, Russell-only rules and required logo acquisition surv
   assert.equal(config.video.logoBackground.required,true);assert.equal(config.video.logoBackground.darkLogoBackground,'#FFFFFF');assert.equal(config.video.logoBackground.lightLogoBackground,'#111111');
   assert.match(rules,/Google Doc → Codex CLI writes the script → Keziah approves → HeyGen creates the video presenter and voiceover → Railway assembles the video → Macy reviews → Google Drive/);
   assert.match(rules,/Every new paid HeyGen render must use both a different Studio Avatar person and a different voice/);
+  assert.match(rules,/Hold video generation before any paid provider request/);
 });
 test('only Russell Chicago can use substantive body questions and grounded topics',()=>{
   const source={documentId:'test',title:'Article title',body:{content:[

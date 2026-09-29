@@ -15,7 +15,7 @@ import {assertFreshPresenterPair} from './presenter-selection.mjs';
 import {applyLocalVideoTask,finishWorkerVideo,retryWorkerVideo} from './local-video.mjs';
 import {videoProvider,isWorkerVideoProvider} from './workflow-config.mjs';
 import {config,rulesHash,appearanceRulesHash} from './rules.mjs';
-import {presenterGender} from './article-identity.mjs';
+import {permittedPresenterGender,presenterGender} from './article-identity.mjs';
 const error=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const now=()=>new Date().toISOString();
 export const publicJob=j=>{if(!j)return j;const {requests,identity,...rest}=j,known=j.provider==='heygen'||isWorkerVideoProvider(j.provider);return {...rest,presenterIssue:known?presenterIssue(j.avatar,j.voice):null,provider:j.provider||'fal.ai',legacy:!known,requests:Object.fromEntries(Object.entries(requests||{}).map(([stage,r])=>[stage,{id:r.id||null,state:r.state,submittedAt:r.submittedAt||null}]))};};
@@ -75,6 +75,7 @@ export class VideoService {
     if(j.files?.video&&j.detectorVersion!==detectorVersion)error('Rebuild this saved footage with the current framing checks before video review or delivery. No new HeyGen render is needed.',409);
     const parent=this.store.get(j.parentId),requiredGender=presenterGender(parent.doc,parent.plan?.presenterContext);
     if(!allowPresenterCorrection&&requiredGender&&pair?.avatar.gender!==requiredGender)error(`PRESENTER_SOURCE_GENDER_MISMATCH: the explicit lawyer blurb requires an approved ${requiredGender} presenter and matching ${requiredGender} voice.`,409);
+    if(!allowPresenterCorrection&&j.provider==='heygen'&&!j.requests?.video?.id&&!j.requests?.video?.submittedAt)permittedPresenterGender(parent.doc,parent.plan?.presenterContext,pair?.avatar.gender);
     if(!currentVideoApproval(j,parent,{allowCompletedStored:allowCompletedStoredApproval}))error('The source or script review changed. Prepare from the current approved version.',409);
     await this.checkFresh(parent,j.index);if(!currentVideoApproval(j,this.store.get(j.parentId),{allowCompletedStored:allowCompletedStoredApproval}))error('The content review changed during this request.',409);
   }
@@ -226,7 +227,7 @@ export class VideoService {
     }
     const create=path.match(/^\/api\/jobs\/([a-f0-9-]+)\/videos$/);
     if(create){if(req.method==='GET')send(res,200,this.list(create[1]).map(j=>({...publicJob(j),currentApproval:currentVideoApproval(j,this.store.get(j.parentId),{allowCompletedStored:true})})));else if(req.method==='POST')send(res,200,await this.create(create[1],await json(req),actor));else error('Unsupported request.',405);return true;}
-    const route=path.match(/^\/api\/videos\/([a-f0-9-]+)(?:\/(speech|render|resume|retry-worker|review|revise|deliver|file|layout-upgrade|framing-replacement))?$/);if(!route)return false;
+    const route=path.match(/^\/api\/videos\/([a-f0-9-]+)(?:\/(speech|render|resume|retry-worker|review|revise|deliver|file|layout-upgrade|framing-replacement|paid-replacement))?$/);if(!route)return false;
     const [,,action]=route,id=route[1];
     if(req.method==='GET'&&!action){send(res,200,publicJob(this.get(id)));return true;}
     if(['GET','HEAD'].includes(req.method)&&action==='file'){
@@ -239,6 +240,7 @@ export class VideoService {
     const body=await json(req);
     if(action==='layout-upgrade'){send(res,202,publicJob(await this.revisions.upgrade(id,actor)));return true;}
     if(action==='framing-replacement'){send(res,200,publicJob(await this.revisions.replaceFraming(id,actor)));return true;}
+    if(action==='paid-replacement'){if(account?.role!=='admin')error('An admin account is required for a one-time paid replacement.',403);send(res,202,publicJob(await this.revisions.replaceFailedRender(id,body,actor)));return true;}
     if(action==='retry-worker'){send(res,202,publicJob(await retryWorkerVideo(this,id,actor)));return true;}
     if(action==='revise'){send(res,200,publicJob(await this.revisions.apply(id,body,actor)));return true;}
     if(action==='deliver'){await this.validate(this.get(id),{allowCompletedStoredApproval:true});this.deliver(id);send(res,202,publicJob(this.get(id)));return true;}

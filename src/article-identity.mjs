@@ -24,10 +24,18 @@ export function presenterGender(doc,context){
  if(context?.gender==='female'&&female&&!male)return 'female';
  return null;
 }
+export function requirePresenterGender(doc,context){
+ const required=presenterGender(doc,context);
+ if(required)return required;
+ const ids=context?.lawyerBlurbParagraphIds||[],text=doc.paragraphs.filter(p=>ids.includes(p.id)&&p.style==='NORMAL_TEXT').map(p=>p.text).join(' ');
+ const male=/\b(he|his|him|male|man|men)\b/i.test(text),female=/\b(she|hers|her|female|woman|women)\b/i.test(text);
+ if(context?.gender==='mixed'&&male&&female)return 'mixed';
+ throw new Error('PRESENTER_SOURCE_GENDER_REQUIRED: identify the lawyer blurb and confirm male or female from explicit pronouns before selecting an avatar. Video generation was held before any provider request.');
+}
 export function permittedPresenterGender(doc,context,requested){
  const choice=clean(requested).toLowerCase();
  if(!['male','female'].includes(choice))throw new Error('Choose a male or female presenter from the approved generic pool.');
- const required=presenterGender(doc,context);
- if(required&&choice!==required)throw new Error(`PRESENTER_SOURCE_GENDER_MISMATCH: the explicit lawyer blurb requires an approved ${required} presenter and matching ${required} voice.`);
+ const required=requirePresenterGender(doc,context);
+ if(required!=='mixed'&&choice!==required)throw new Error(`PRESENTER_SOURCE_GENDER_MISMATCH: the explicit lawyer blurb requires an approved ${required} presenter and matching ${required} voice.`);
  return choice;
 }

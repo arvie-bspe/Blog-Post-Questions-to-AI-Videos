@@ -18,6 +18,45 @@ const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status
 const now=()=>new Date().toISOString();
 export class VideoRevisions{
   constructor(service){this.service=service;this.reviewing=new Set();this.applying=new Set();}
+  async replaceFailedRender(id,body,actor){
+    const s=this.service;
+    if(this.applying.has(id)||s.active.has(id))fail('This video is already processing.',409);this.applying.add(id);
+    try{
+      s.assertHeyGenEnabled();
+      const old=s.get(id),request=old.requests?.video;
+      if(old.provider!=='heygen'||!['needs_attention','failed'].includes(old.status)||!request?.id||request.state!=='failed'||old.files?.original||old.files?.video)
+        fail('Only a terminal HeyGen failure with no generated media can create this replacement.',409);
+      if(body.acceptCost!==true)fail('Authorize the displayed one-time replacement cost first.');
+      const maximum=Number(body.maxEstimatedCost),reason=String(body.reason||'').trim();
+      if(!Number.isFinite(maximum)||maximum<=0||maximum>12)fail('Set a one-time replacement ceiling from $0.01 to $12.00.');
+      if(reason.length<20||reason.length>1000)fail('Add 20 to 1000 characters explaining this one-time replacement.');
+      await s.validate(old,{allowCompletedStoredApproval:true});
+      const parent=s.store.get(old.parentId),currentApprovalHash=approved(parent,old.index);
+      if(scriptText(parent.plan.videos[old.index])!==old.script||parent.doc.sourceHash!==old.source.sourceHash)
+        fail('The script or source changed. Prepare a new setup from the current reviewed content.',409);
+      const conflicting=s.list(old.parentId).find(video=>video.id!==old.id&&video.index===old.index&&(
+        ['prepared','working','compositing','paused','needs_reconciliation'].includes(video.status)||
+        ['submitting','waiting','pending','processing','queued'].includes(video.requests?.video?.state)
+      ));
+      if(conflicting)fail('Another setup or provider request for this question is already pending. Review it before creating a replacement.',409);
+      const previous=[{avatar:old.avatar,voice:old.voice}],chosen=choosePresenter(parent,old.index,s.list(),previous);
+      assertFreshPresenterPair(chosen,s.list(),previous);
+      const data=prepareHeyGen(parent,{index:old.index,thumbnailTitle:old.thumbnailTitle,presenterAccepted:true,aspectRatio:old.format?.aspectRatio||'9:16'},chosen.avatar,chosen.voice);
+      if(data.approvalHash!==currentApprovalHash||data.script!==old.script||data.source.sourceHash!==old.source.sourceHash)
+        fail('The approved content changed while preparing the replacement.',409);
+      if(data.renderEstimate>maximum)fail(`The replacement estimate is $${data.renderEstimate.toFixed(2)}, above the authorized $${maximum.toFixed(2)} ceiling.`);
+      const existing=s.db.prepare('SELECT payload FROM videos WHERE identity=?').get(data.identity);
+      if(existing)fail('This exact replacement setup already exists. Open the saved setup instead of creating another request.',409);
+      const at=now(),replacement={...data,id:randomUUID(),created:at,createdBy:actor,presenterAcceptedAt:at,selection:{...chosen.selection,method:'admin_failed_render_replacement'},previousVideoId:old.id,generationVersion:(old.generationVersion||1)+1,replacementReason:reason,replacementAuthorization:{actor,at,maxEstimatedCost:maximum,estimatedCost:data.renderEstimate,providerRequestLimit:1,sourceFailureRequestId:request.id},authorization:null,automation:null};
+      s.db.exec('BEGIN IMMEDIATE');
+      try{
+        s.save(replacement);old.status='changes_requested';old.replacementRecovery={actor,at,reason,replacementId:replacement.id,maxEstimatedCost:maximum,sourceFailureRequestId:request.id};s.save(old);s.store.record(parent.id,actor,'prepare_failed_heygen_replacement');s.db.exec('COMMIT');
+      }catch(error){s.db.exec('ROLLBACK');throw error;}
+      try{await s.start(replacement.id,'render',{acceptCost:true,acceptedEstimate:replacement.renderEstimate},actor);}
+      catch(error){replacement.error=String(error.message||error);s.save(replacement);}
+      return s.get(replacement.id);
+    }finally{this.applying.delete(id);}
+  }
   async replaceFraming(id,actor){
     const s=this.service;
     if(this.applying.has(id)||s.active.has(id))fail('This video is already processing.',409);this.applying.add(id);

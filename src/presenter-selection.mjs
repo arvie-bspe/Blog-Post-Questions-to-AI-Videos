@@ -1,5 +1,5 @@
 import {hash} from './domain.mjs';
-import {presenterGender} from './article-identity.mjs';
+import {requirePresenterGender} from './article-identity.mjs';
 import {presenterPool,professionalPresenter} from './presenter-compatibility.mjs';
 export {presenterPool};
 
@@ -24,8 +24,8 @@ export function paidPresenterHistory(history=[],pool=presenterPool){
 }
 
 function candidatesFor(parent,history,reserved,pool){
- const gender=presenterGender(parent.doc,parent.plan?.presenterContext);
- const avatars=pool.avatars.filter(avatar=>avatar.type==='studio_avatar'&&(!gender||avatar.gender===gender)&&avatar.gender&&pool.voices.some(voice=>compatible(avatar,voice,pool)));
+ const gender=requirePresenterGender(parent.doc,parent.plan?.presenterContext),singleGender=gender==='mixed'?null:gender;
+ const avatars=pool.avatars.filter(avatar=>avatar.type==='studio_avatar'&&(!singleGender||avatar.gender===singleGender)&&avatar.gender&&pool.voices.some(voice=>compatible(avatar,voice,pool)));
  if(!avatars.length)throw new Error('PRESENTER_PERSONA_UNAVAILABLE: no reviewed suit/blazer presenter and compatible professional voice match the explicit lawyer-blurb information.');
  const paid=paidPresenterHistory(history,pool),latest=paid[0]||null;
  const reservedAvatars=new Set(reserved.map(item=>family(item?.avatar,pool)).filter(Boolean));

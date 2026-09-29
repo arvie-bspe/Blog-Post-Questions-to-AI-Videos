@@ -94,6 +94,17 @@ test('mismatched manual profiles and saved setups cannot consume the daily allow
  }finally{h.close();}
 });
 
+test('HeyGen holds every new render when lawyer-blurb gender evidence is inconclusive',async()=>{
+ let submits=0;const h=harness({heygen:{submit:async()=>{submits++;throw new Error('must not submit');}}});try{
+  const femaleAvatar=presenterPool.avatars.find(a=>a.professionalReview?.approved&&a.gender==='female'),femaleVoice=presenterPool.voices.find(v=>v.id===femaleAvatar.professionalReview.allowedVoiceIds[0]);
+  assert.throws(()=>prepareHeyGen(h.parent,{...hgSettings,avatarId:femaleAvatar.id,voiceId:femaleVoice.id},femaleAvatar,femaleVoice),/PRESENTER_SOURCE_GENDER_MISMATCH/);
+  const parent=h.store.get(h.parent.id);parent.plan.presenterContext={gender:'unspecified',lawyerBlurbParagraphIds:[]};parent.questionReviews=[];approveFixture(parent);h.store.save(parent);
+  assert.throws(()=>h.service.automation.configure(parent.id,{enabled:true,avatarId:avatar.id,voiceId:voice.id,acceptCost:true,maxEstimatedCost:2},'Arvie'),/PRESENTER_SOURCE_GENDER_REQUIRED/);
+  await assert.rejects(h.service.create(parent.id,hgSettings,'Arvie'),/PRESENTER_SOURCE_GENDER_REQUIRED/);
+  assert.equal(h.store.db.prepare('SELECT count(*) AS n FROM video_spend').get().n,0);assert.equal(submits,0);
+ }finally{h.close();}
+});
+
 test('casual manual profiles and stale prepared setups are blocked before allowance consumption or provider submission',async()=>{
  let submits=0;const h=harness({heygen:{submit:async()=>{submits++;throw new Error('must not submit');}}});try{
   const casual=presenterPool.avatars.find(a=>a.id==='Patrizio_standing_businesstraining_front');
@@ -294,5 +305,36 @@ test('Macy paid replacement requires cost acceptance and preserves the older vid
     await assert.rejects(h.service.review(initial.id,{decision:'reject',note:'The speaking motion needs another render.',changeType:'render'},'Macy'),/cost/);assert.equal(submits,0);
     const next=await h.service.review(initial.id,{decision:'reject',note:'The speaking motion needs another render.',changeType:'render',acceptCost:true,acceptedEstimate:2},'Macy');await idle(h.service,next.id);assert.notEqual(next.id,initial.id);assert.notEqual(next.avatar.id,initial.avatar.id);assert.notEqual(next.voice.id,initial.voice.id);assert.equal(h.service.get(next.id).previousVideoId,initial.id);assert.equal(h.service.get(initial.id).status,'changes_requested');assert.equal(submits,1);
     await assert.rejects(h.service.review(initial.id,{decision:'reject',note:'The speaking motion needs another render.',changeType:'render',acceptCost:true,acceptedEstimate:2},'Macy'),/completed render/);assert.equal(submits,1);
+  }finally{h.close();}
+});
+
+test('an admin can replace one terminal HeyGen failure without changing the normal cost limit or duplicating a request',async()=>{
+  let submits=0;const h=harness({heygen:{submit:async()=>{submits++;return {id:'fresh-paid-replacement',state:'waiting'};},status:async()=>({status:'failed'})}});
+  try{
+    h.service.heygen.look=async id=>({...presenterPool.avatars.find(item=>item.id===id),supported_api_engines:['avatar_iv'],status:'completed'});
+    const created=await h.service.create(h.parent.id,hgSettings,'Arvie'),failed=h.service.get(created.id),beforeParent=structuredClone(h.store.get(h.parent.id));
+    failed.status='needs_attention';failed.error='HeyGen could not render this video because API credits were insufficient.';failed.requests.video={id:'failed-paid-request',state:'failed',submittedAt:'2026-09-29T12:00:00Z'};h.service.save(failed);
+    const reason='One-time replacement after the terminal provider billing failure.';
+    await assert.rejects(h.service.revisions.replaceFailedRender(failed.id,{acceptCost:true,maxEstimatedCost:failed.renderEstimate-.01,reason},'Arvie'),/above the authorized/);
+    assert.equal(h.service.list(h.parent.id).length,1);assert.equal(submits,0);assert.equal(h.store.db.prepare('SELECT count(*) AS n FROM video_spend').get().n,0);
+    const replacement=await h.service.revisions.replaceFailedRender(failed.id,{acceptCost:true,maxEstimatedCost:failed.renderEstimate,reason},'Arvie');await idle(h.service,replacement.id);
+    const saved=h.service.get(replacement.id),old=h.service.get(failed.id);
+    assert.equal(submits,1);assert.equal(saved.requests.video.id,'fresh-paid-replacement');assert.equal(saved.status,'needs_attention');assert.equal(saved.previousVideoId,failed.id);assert.equal(saved.script,failed.script);assert.deepEqual(saved.format,failed.format);
+    assert.notEqual(saved.avatar.id,failed.avatar.id);assert.notEqual(saved.voice.id,failed.voice.id);assert.equal(saved.replacementAuthorization.maxEstimatedCost,failed.renderEstimate);assert.equal(saved.replacementAuthorization.providerRequestLimit,1);
+    assert.equal(old.status,'changes_requested');assert.equal(old.requests.video.id,'failed-paid-request');assert.equal(old.replacementRecovery.replacementId,saved.id);assert.equal(h.store.db.prepare('SELECT count AS n FROM video_spend WHERE stage=?').get('heygen_render').n,1);
+    assert.deepEqual(h.store.get(h.parent.id).plan,beforeParent.plan);assert.deepEqual(h.store.get(h.parent.id).questionReviews,beforeParent.questionReviews);
+    await assert.rejects(h.service.revisions.replaceFailedRender(failed.id,{acceptCost:true,maxEstimatedCost:failed.renderEstimate,reason},'Arvie'),/terminal HeyGen failure/);assert.equal(submits,1);
+  }finally{h.close();}
+});
+
+test('terminal-failure replacement still requires conclusive lawyer-blurb gender and an admin route',async()=>{
+  let submits=0;const h=harness({heygen:{submit:async()=>{submits++;throw new Error('must not submit');}}});
+  try{
+    const created=await h.service.create(h.parent.id,hgSettings,'Arvie'),failed=h.service.get(created.id);failed.status='needs_attention';failed.requests.video={id:'failed-gender-request',state:'failed'};h.service.save(failed);
+    const body={acceptCost:true,maxEstimatedCost:failed.renderEstimate,reason:'One-time replacement requires verified source gender evidence.'};
+    await assert.rejects(h.service.route({req:{method:'POST'},res:{},path:`/api/videos/${failed.id}/paid-replacement`,url:new URL('https://studio.test/'),actor:'Member',account:{role:'member'},json:async()=>body,send:()=>{}}),/admin account/);
+    const parent=h.store.get(h.parent.id);parent.plan.presenterContext={gender:'unspecified',lawyerBlurbParagraphIds:[]};parent.questionReviews=[];approveFixture(parent);h.store.save(parent);failed.approvalHash=approved(parent,0);h.service.save(failed);
+    await assert.rejects(h.service.revisions.replaceFailedRender(failed.id,body,'Arvie'),/PRESENTER_SOURCE_GENDER_REQUIRED/);
+    assert.equal(h.service.list(h.parent.id).length,1);assert.equal(submits,0);assert.equal(h.store.db.prepare('SELECT count(*) AS n FROM video_spend').get().n,0);
   }finally{h.close();}
 });

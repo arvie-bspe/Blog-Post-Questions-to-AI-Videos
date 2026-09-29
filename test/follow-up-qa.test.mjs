@@ -140,6 +140,18 @@ test('prepared worker recovery UI uses the worker retry endpoint instead of HeyG
   assert.deepEqual(calls,[{path:`videos/${saved.id}/retry-worker`,body:{}}]);
 });
 
+test('terminal HeyGen failure UI offers only an admin one-time replacement with the saved estimate',async t=>{
+  const app=appFor(t),parent=app.store.create(approve(source('failed-heygen-ui'))),previousDocument=globalThis.document;
+  const avatar={id:'admin-failure-avatar',name:'Professional Presenter',gender:'female'},voice={id:'admin-failure-voice',name:'Professional Voice',gender:'female'};
+  const failed={id:'12345678-1234-1234-1234-123456789abc',parentId:parent.id,index:0,provider:'heygen',status:'needs_attention',question:parent.plan.videos[0].question,avatar,voice,layoutVersion:config.video.layoutVersion,detectorVersion:config.video.faceDetectorVersion,source:{rulesHash:appearanceRulesHash},currentApproval:true,renderEstimate:2.07,requests:{video:{id:'failed-request',state:'failed'}},files:{},reviews:[]};
+  const root={isConnected:true,innerHTML:'',querySelectorAll:()=>[],querySelector:()=>null};globalThis.document={querySelector:()=>root};
+  t.after(()=>{root.isConnected=false;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;});
+  const api=async path=>path==='video-config'?{...config.video,detectorVersion:config.video.faceDetectorVersion,provider:'heygen',configured:true,appearanceRulesHash}:path===`jobs/${parent.id}/videos`?[failed]:{runs:[]};
+  await mountVideo(parent,api,message=>assert.fail(message),{name:'Arvie',role:'admin'});
+  assert.match(root.innerHTML,/Create one new HeyGen replacement/);assert.match(root.innerHTML,/\$2\.07/);assert.match(root.innerHTML,/id="failed-render-replacement"/);assert.doesNotMatch(root.innerHTML,/An admin account is required/);
+  await mountVideo(parent,api,message=>assert.fail(message),{name:'Reviewer',role:'member'});assert.match(root.innerHTML,/An admin account is required/);assert.match(root.innerHTML,/Create &amp; generate replacement|Create & generate replacement/);
+});
+
 test('missing approved video UI starts exactly the absent automatic run',async t=>{
   const app=appFor(t),parent=app.store.create(approve(source('missing-approved-ui'))),calls=[],previousDocument=globalThis.document;
   let startButton=null;const root={isConnected:true,innerHTML:'',querySelector:()=>null,querySelectorAll:selector=>{
@@ -208,7 +220,9 @@ test('presenter evidence remains blurb-only, mixed-aware, and independent of uns
   const job=source('gender-controls'),context=job.plan.presenterContext,blurb=job.doc.paragraphs.find(p=>p.id==='p5');
   blurb.text='Jordan handles appeals.';job.doc.paragraphs.push({id:'other',style:'NORMAL_TEXT',text:'A woman explains the general filing process.'});
   assert.equal(presenterGender(job.doc,context),null);
+  assert.throws(()=>prepareWorkerVideo(approve(job),0,'liteavatar_worker'),/PRESENTER_SOURCE_GENDER_REQUIRED/);
   blurb.text='Jordan represents women in appeals.';context.gender='unspecified';assert.equal(presenterGender(job.doc,context),null);
+  assert.throws(()=>permittedPresenterGender(job.doc,context,'female'),/PRESENTER_SOURCE_GENDER_REQUIRED/);
   blurb.text='One attorney is a woman; another is a man.';context.gender='mixed';assert.equal(presenterGender(job.doc,context),null);
   assert.equal(permittedPresenterGender(job.doc,context,'male'),'male');assert.equal(permittedPresenterGender(job.doc,context,'female'),'female');
   blurb.text='She handles appeals.';context.gender='male';assert.equal(presenterGender(job.doc,context),null);

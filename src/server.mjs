@@ -3,7 +3,7 @@ import {readFileSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {Store} from './store.mjs';
-import {config,rules,appearanceRules,presenterRules,appearanceRulesHash,rulesHash} from './rules.mjs';
+import {config,rules,appearanceRules,presenterRules,appearanceRulesHash,rulesHash,videoRulesCompatible} from './rules.mjs';
 import {parseMonthly,parseClients,selectClient,inspect,recordIdentity,hash,validatePlan,validateForJob,googleId} from './domain.mjs';
 import {preparedExample} from './sample.mjs';
 import {analyze} from './ai.mjs';
@@ -30,7 +30,7 @@ const file=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const brief=j=>({id:j.id,status:j.status,title:j.doc.pageTitle,client:j.client.key,mode:j.mode,origin:j.origin||null,updated:j.updated,videoCount:j.plan?.videos.length||0,scriptTargetSeconds:scriptTargetSeconds(j),workerTasks:j.workerTasks||[]});
 export function isCurrentVideo(video,parent,provider){
-  try{const expected=isWorkerVideoProvider(video.provider)||parent.mode===directMode?appearanceRulesHash:rulesHash,active=['prepared','working','compositing','visual_review','delivery_pending','delivered','revision_pending','paused','needs_attention','needs_reconciliation','failed'].includes(video.status);return active&&video.provider===provider&&!presenterIssue(video.avatar,video.voice)&&(!video.files?.video||video.detectorVersion===config.video.faceDetectorVersion)&&video.layoutVersion===config.video.layoutVersion&&video.source?.rulesHash===expected&&currentVideoApproval(video,parent,{allowCompletedStored:true});}catch{return false;}
+  try{const expected=isWorkerVideoProvider(video.provider)||parent.mode===directMode?appearanceRulesHash:rulesHash,active=['prepared','working','compositing','visual_review','delivery_pending','delivered','revision_pending','paused','needs_attention','needs_reconciliation','failed'].includes(video.status);return active&&video.provider===provider&&!presenterIssue(video.avatar,video.voice)&&(!video.files?.video||video.detectorVersion===config.video.faceDetectorVersion)&&video.layoutVersion===config.video.layoutVersion&&videoRulesCompatible(video.source?.rulesHash,expected)&&currentVideoApproval(video,parent,{allowCompletedStored:true});}catch{return false;}
 }
 export function markdown(job){
   let out=`# ${job.doc.pageTitle}\n\nManual pilot · ${job.mode} · ${job.origin||'Source inspection'}\n\nStatus: ${job.status}. This is not a client approval or finished video.\n\nSource: ${job.row.documentUrl}\n\nRules: ${job.rulesVersion}\nSource hash: ${job.doc.sourceHash}\nCaptured: ${job.created}\n\n`;
