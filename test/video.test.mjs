@@ -243,11 +243,11 @@ test('one mocked HeyGen generation automatically assembles real media then waits
     const j=await h.service.create(h.parent.id,hgSettings,'Arvie');await h.service.start(j.id,'render',{acceptCost:true,acceptedEstimate:2},'Arvie');
     for(let i=0;i<1200&&h.service.active.has(j.id);i++)await new Promise(r=>setTimeout(r,25));
     const result=h.service.get(j.id);assert.equal(result.status,'visual_review',result.error);assert.equal(submits,1);assert.equal(result.technicalQA.native1080,true);assert.equal(result.technicalQA.aspectRatio,'9:16');assert.equal(result.technicalQA.logoIncluded,true);assert.equal(result.technicalQA.logoBackground.color,'#FFFFFF');assert.equal(result.technicalQA.logoBackground.tone,'light');assert.equal(result.files.video,true);assert.equal(result.files.captions,true);assert.equal(result.source.folderUrl,h.parent.row.folderUrl);assert.ok(existsSync(join(h.service.directory(result),'thumbnail.png')));
-    await assert.rejects(h.service.review(j.id,{decision:'approve',note:'Test approval without checks'},'Macy'),/Check lips/);
+    await assert.rejects(h.service.review(j.id,{decision:'reject',note:''},'Macy'),/at least 10 characters/);
     const revised=await h.service.review(j.id,{decision:'reject',note:'Automated fixture: increase caption size for readability.',changeType:'layout',visualSettings:{captionSize:64,captionBottom:115,logoScale:1}},'Macy');assert.equal(revised.status,'compositing');
     for(let i=0;i<1200&&h.service.active.has(j.id);i++)await new Promise(r=>setTimeout(r,25));
     const afterRevision=h.service.get(j.id);assert.equal(afterRevision.status,'visual_review',afterRevision.error);assert.equal(afterRevision.outputRevision,2);assert.equal(afterRevision.reviews.length,0);assert.equal(afterRevision.reviewHistory.length,1);assert.equal(submits,1);assert.ok(existsSync(join(h.service.directory(afterRevision),'revisions','1','final.mp4')));
-    assert.ok(['delivery_pending','delivered'].includes((await h.service.review(j.id,{decision:'approve',note:'AUTOMATED FIXTURE ONLY, not human quality acceptance.',checkedVideo:true,checkedCaptions:true,checkedContacts:true,checkedFraming:true,checkedNoNap:true,checkedEndCard:true},'Macy')).status));await idle(h.service,j.id);assert.equal(h.service.get(j.id).status,'delivered');assert.equal(submits,1);
+    assert.ok(['delivery_pending','delivered'].includes((await h.service.review(j.id,{decision:'approve',note:''},'Macy')).status));await idle(h.service,j.id);assert.equal(h.service.get(j.id).status,'delivered');assert.equal(submits,1);
   }finally{h.close();}
 });
 

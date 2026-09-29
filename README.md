@@ -8,13 +8,13 @@ Production app: [Article Video Studio](https://article-video-studio-production.u
 
 **Google Doc → Codex CLI writes the script → Keziah approves → HeyGen creates the video presenter and voiceover → Railway assembles the video → Macy reviews → Google Drive**
 
-1. Paste a Google Doc URL into **Articles**. If the document contains multiple tabs, choose the article tab explicitly.
-2. Railway retrieves and fingerprints that tab. The Monthly Sheet is not read by this workflow.
+1. In **Articles**, choose the client profile from the automatically loaded dropdown and enter the Google Doc URL, firm homepage, published article URL, and Google Drive Visual folder. If the document contains multiple tabs, choose the article tab explicitly.
+2. Railway validates the destination details before it retrieves, fingerprints, or sends the selected tab for script generation. The Monthly Sheet is not read by this workflow.
 3. Codex CLI independently reviews the article, selects useful explicit questions or formulates source-supported questions, drafts approximately 30-second scripts, and attaches exact article evidence to every answer sentence.
-4. Keziah reviews each script separately. **Request changes** queues an AI rewrite for that question only. Sibling scripts and approvals stay unchanged.
+4. Keziah reviews each script separately. Approval needs no note or checklist. **Request changes** requires a note and queues an AI rewrite for that question only. Sibling scripts and approvals stay unchanged.
 5. Approving one script queues only that video's HeyGen request. The app selects an approved Studio Avatar and a matching English voice using explicit lawyer-blurb gender evidence. Every new paid render uses both a different avatar person and a different voice from the latest paid render; pending jobs reserve their choices and automatic selection then favors the globally least recently used compatible choices. If either compatible alternative is unavailable, submission is held. HeyGen supplies the speech, lip-sync, source footage, and caption timing. A paid replacement is never submitted without the saved review and cost authorization.
 6. Railway creates the 1080 × 1920 output with synchronized captions, the homepage logo on an automatically selected contrasting background, thumbnail, and a separate three-second contact end card.
-7. Macy reviews each finished video separately, including professional suit/blazer clothing and a natural voice that suits the presenter's persona. New renders use visually reviewed business attire and explicitly compatible voice pairings; casual shirts, T-shirts and polos are excluded. A layout change reuses existing media; a wording change returns to Keziah; a presenter, voice, or lip-sync change queues a new render with a newly rotated avatar and voice.
+7. Macy reviews each finished video separately, including professional suit/blazer clothing and a natural voice that suits the presenter's persona. Approval needs no note or checklist; requesting a change requires a note. New renders use visually reviewed business attire and explicitly compatible voice pairings; casual shirts, T-shirts and polos are excluded. A layout change reuses existing media; a wording change returns to Keziah; a presenter, voice, or lip-sync change queues a new render with a newly rotated avatar and voice.
 8. Macy's approval automatically uploads the MP4, thumbnail, and VTT captions to the job's Google Drive Visual folder.
 
 The former **Video Content and Script Rules** do not run in the new direct-document path. Historical jobs keep their original policy references for audit history. The active appearance and quality rules still govern the video output.
@@ -46,7 +46,7 @@ Copy the settings from [.env.example](.env.example) into Railway Variables, usin
 
 Codex script analysis and script rewrites have no application-level daily cap. `DAILY_ANALYSIS_LIMIT` is no longer used and can be removed from Railway Variables. The separate `DAILY_VIDEO_LIMIT` still controls new paid HeyGen submissions.
 
-The Google OAuth account needs access to the pasted Google Docs and each selected Visual folder. New jobs can begin with only the Doc URL; the firm homepage, published article URL, and Visual folder must be added before video generation.
+The Google OAuth account needs access to the pasted Google Docs, the client-directory Sheet, and each selected Visual folder. The studio loads client profiles automatically. A new job starts script generation only after the client, firm homepage, published article URL, and Visual folder are supplied with the Google Doc URL.
 
 ## Team sign-in
 

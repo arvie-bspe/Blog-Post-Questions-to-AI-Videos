@@ -72,9 +72,11 @@ export class VideoRevisions{
     try{
       const j=s.get(id),genderCorrection=body.decision==='reject'&&body.changeType==='gender';await s.validate(j,{allowPresenterCorrection:genderCorrection});if(body.expectedOutputRevision!==undefined&&body.expectedOutputRevision!==(j.outputRevision||1))fail('This output changed. Review its current version.',409);
       if(j.status!=='visual_review')fail('A completed render is required before visual review.',409);
-      if(!['approve','reject'].includes(body.decision)||typeof body.note!=='string'||body.note.trim().length<10||body.note.length>4000)fail('Choose a decision and add at least 10 characters of review notes.');
-      if(body.decision==='approve'&&(!body.checkedVideo||!body.checkedCaptions||!body.checkedContacts))fail('Check lips, audio, captions, contacts, logo, thumbnail, and playback before marking ready.');
-      if(body.decision==='approve'&&(!body.checkedFraming||!body.checkedNoNap||!body.checkedEndCard))fail('Confirm full-frame upper-torso framing, clean-logo/no-contact speech frames, and the separate white end card.');
+      if(!['approve','reject'].includes(body.decision))fail('Choose approve or request changes.');
+      if(body.note!==undefined&&typeof body.note!=='string')fail('Review notes must be text.');
+      const note=String(body.note||'').trim();
+      if(String(body.note||'').length>4000)fail('Review notes cannot exceed 4000 characters.');
+      if(body.decision==='reject'&&note.length<10)fail('Add at least 10 characters of review notes when requesting video changes.');
       if(body.decision==='approve'&&j.provider==='liteavatar_worker'&&j.avatar?.rightsStatus==='evaluation_only'&&s.env.LITEAVATAR_ASSET_RIGHTS_CONFIRMED!=='true')fail('This trial avatar is approved for internal evaluation only. Confirm commercial rights and set LITEAVATAR_ASSET_RIGHTS_CONFIRMED=true before Drive delivery.',409);
       if(body.decision==='reject'&&body.changeType==='layout')visualSettings(body.visualSettings);
       if(genderCorrection){
@@ -83,9 +85,9 @@ export class VideoRevisions{
         if(j.avatar?.gender===body.presenterGender&&j.voice?.gender===body.presenterGender)fail(`This video already uses an approved ${body.presenterGender} presenter and matching voice.`);
       }
       if(body.decision==='reject'&&body.changeType==='render'&&!isWorkerVideoProvider(videoProvider(s.env))&&(body.acceptCost!==true||body.acceptedEstimate!==j.renderEstimate))fail('Accept the displayed generation cost estimate before requesting this change.');
-      j.reviews.push({actor,at:now(),decision:body.decision,note:body.note.trim(),changeType:body.decision==='reject'?body.changeType||'manual':null,presenterGender:genderCorrection?body.presenterGender:null,checkedVideo:!!body.checkedVideo,checkedCaptions:!!body.checkedCaptions,checkedContacts:!!body.checkedContacts,checkedFraming:!!body.checkedFraming,checkedNoNap:!!body.checkedNoNap,checkedEndCard:!!body.checkedEndCard,authenticated:!s.local,outputRevision:j.outputRevision||1});
+      j.reviews.push({actor,at:now(),decision:body.decision,note,changeType:body.decision==='reject'?body.changeType||'manual':null,presenterGender:genderCorrection?body.presenterGender:null,authenticated:!s.local,outputRevision:j.outputRevision||1});
       if(body.decision==='approve'){j.status='delivery_pending';j.error=null;s.save(j);s.manifest(j);s.deliver(j.id);return s.get(j.id);}
-      j.status='revision_pending';j.revisionRequest={actor,note:body.note.trim(),type:body.changeType||'manual',presenterGender:genderCorrection?body.presenterGender:null,status:'pending',at:now()};s.save(j);s.store.record(j.parentId,actor,'video_revision_requested');
+      j.status='revision_pending';j.revisionRequest={actor,note,type:body.changeType||'manual',presenterGender:genderCorrection?body.presenterGender:null,status:'pending',at:now()};s.save(j);s.store.record(j.parentId,actor,'video_revision_requested');
       return await this.apply(j.id,body,actor);
     }finally{this.reviewing.delete(id);}
   }

@@ -47,9 +47,9 @@ test('local pilot inspect, example, review, permissions, failures, and exports',
     const runtimeResponse=await request(`jobs/${runtimeJob.id}/script-runtime`,{expectedRevision:runtimeJob.revision,targetSeconds:60,note:'Juan one-minute script override.'});assert.equal(runtimeResponse.status,200);assert.equal(runtimeResponse.body.scriptTargetSeconds,60);assert.equal(runtimeResponse.body.runtimeOverrides.at(-1).previous,30);
     assert.equal((await request(`jobs/${runtimeJob.id}/script-runtime`,{expectedRevision:runtimeJob.revision,targetSeconds:30,note:'Stale request must fail.'})).status,409);
     assert.equal((await request(`jobs/${job.id}/example`,{})).status,409);
-    assert.equal((await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Source reviewed carefully.'},'Keziah')).status,400);
-    const deniedOverride=await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Attempt a one-time approval and video format override.',checkedEvidence:true,checkedWarnings:true,videoOverride:{aspectRatio:'16:9',maxEstimatedCost:5,acceptCost:true,reason:'This single fixture video uses an administrative approval override.'}},'Macy');assert.equal(deniedOverride.status,403);assert.deepEqual(dispatches,[]);
-    const approval=await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Automated QA exercise only. A team member must do the actual source review.',checkedEvidence:true},'Macy');assert.equal(approval.status,200,approval.body.error);job=approval.body;
+    assert.equal((await request(`jobs/${job.id}/review`,{index:0,decision:'reject',note:''},'Keziah')).status,400);
+    const deniedOverride=await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'',videoOverride:{aspectRatio:'16:9',maxEstimatedCost:5,acceptCost:true,reason:'This single fixture video uses an administrative approval override.'}},'Macy');assert.equal(deniedOverride.status,403);assert.deepEqual(dispatches,[]);
+    const approval=await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:''},'Macy');assert.equal(approval.status,200,approval.body.error);job=approval.body;
     assert.equal(job.status,'partially_reviewed');assert.equal(job.questionStates[1].status,'pending');assert.equal(job.reviews[0].testOnly,true);assert.equal(job.reviews[0].authenticated,false);
     const settings={index:0,avatarId:'unknown-presenter',voiceId:'unknown-voice',presenterAccepted:true,thumbnailTitle:'Support Letters for Your Appeal'};
     const video=await request(`jobs/${job.id}/videos`,settings,'Macy');
@@ -60,11 +60,11 @@ test('local pilot inspect, example, review, permissions, failures, and exports',
     const noKey=await request('video-library?kind=avatars');assert.equal(noKey.status,400);assert.match(noKey.body.error,/HEYGEN_API_KEY/);
     assert.equal((await request('video-settings',{falKey:'old-fal-key'})).status,403);
     assert.equal((await request(`jobs/${job.id}/export`)).body.doc.sourceHash,job.doc.sourceHash);
-    assert.equal((await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Repeated approval must not run twice.',checkedEvidence:true},'Keziah')).status,409);
-    const overridden=await request(`jobs/${job.id}/review`,{index:1,decision:'approve',note:'Administrative fixture approval for one landscape video only.',checkedEvidence:true,checkedWarnings:true,videoOverride:{aspectRatio:'16:9',maxEstimatedCost:5,acceptCost:true,reason:'Arvie authorized this single video in place of the normal reviewer.'}},'Arvie');assert.equal(overridden.status,200,overridden.body.error);assert.equal(overridden.body.questionStates[1].status,'approved');assert.equal(overridden.body.questionStates[1].reviews.at(-1).adminOverride.aspectRatio,'16:9');
+    assert.equal((await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:''},'Keziah')).status,409);
+    const overridden=await request(`jobs/${job.id}/review`,{index:1,decision:'approve',note:'',videoOverride:{aspectRatio:'16:9',maxEstimatedCost:5,acceptCost:true,reason:'Arvie authorized this single video in place of the normal reviewer.'}},'Arvie');assert.equal(overridden.status,200,overridden.body.error);assert.equal(overridden.body.questionStates[1].status,'approved');assert.equal(overridden.body.questionStates[1].reviews.at(-1).adminOverride.aspectRatio,'16:9');
     assert.deepEqual(dispatches,[{id:job.id,actor:'Macy',index:0,profileMode:null,aspectRatio:null},{id:job.id,actor:'Arvie',index:1,profileMode:'one_time_approval_override',aspectRatio:'16:9'}]);
     job.status='content_review';job.questionReviews=[];job.origin='OpenAI API draft with separate semantic review';job.audit={passed:false,issues:['Unsupported claim.']};app.store.save(job);
-    assert.match((await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:'Attempting to bypass failed audit.',checkedEvidence:true},'Keziah')).body.error,/unresolved/);
+    assert.match((await request(`jobs/${job.id}/review`,{index:0,decision:'approve',note:''},'Keziah')).body.error,/unresolved/);
     job.validation={errors:['test']};job.status='analyzing';app.store.save(job);assert.equal((await request(`jobs/${job.id}/review`,{decision:'reject',note:'Cannot review during analysis.'},'Keziah')).status,409);
   }finally{await new Promise(r=>app.server.close(r));app.store.close();rmSync(dir,{recursive:true,force:true});}
 });

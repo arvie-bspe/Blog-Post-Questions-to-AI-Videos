@@ -141,8 +141,12 @@ export function createApp(env=process.env){
         return send(res,200,job);
       }
       if(req.method==='POST'&&path==='/api/documents/import'){
-        const body=await json(req),source=await directSource(body),identity=hash([directMode,source.row.documentId,source.row.tabId,source.doc.sourceHash,scriptPolicyHash]);
-        let job=store.create({...source,mode:directMode,identity,rulesVersion:workflowVersion,rulesHash,appearanceRulesHash,scriptPolicyVersion,scriptRulesHash:scriptPolicyHash,maxVideos:Math.max(1,Math.min(4,Number(body.maxVideos)||2)),setupIssues:directSetupIssues(source.row,source.client),origin:'Awaiting configured AI resolver'});store.record(job.id,actor,'import_direct_google_doc');
+        const body=await json(req),clientKey=String(body.clientKey||'').trim();
+        if(!clientKey||clientKey.toLowerCase()==='unassigned')fail('Choose a client profile before script generation.');
+        const source=await directSource({...body,clientKey}),setupIssues=directSetupIssues(source.row,source.client);
+        if(setupIssues.length)fail(`Complete the video destination before script generation. ${setupIssues.join(' ')}`);
+        const identity=hash([directMode,source.row.documentId,source.row.tabId,source.doc.sourceHash,scriptPolicyHash]);
+        let job=store.create({...source,mode:directMode,identity,rulesVersion:workflowVersion,rulesHash,appearanceRulesHash,scriptPolicyVersion,scriptRulesHash:scriptPolicyHash,maxVideos:Math.max(1,Math.min(4,Number(body.maxVideos)||2)),setupIssues:[],origin:'Awaiting configured AI resolver'});store.record(job.id,actor,'import_direct_google_doc');
         if(!job.plan&&['inspected','failed','awaiting_script'].includes(job.status)){
           if(directResolver.configured())job=await scripts.start(job.id);
           else {job.status='awaiting_script';job.error=aiProvider(env)==='codex_worker'?'Waiting for the private Codex worker connection.':'Waiting for Claude credentials and an explicit Claude provider setting.';store.save(job);}
@@ -214,7 +218,10 @@ export function createApp(env=process.env){
           const body=await json(req),index=body.index,current=questionState(job,index);
           if(body.expectedQuestionHash!==undefined?body.expectedQuestionHash!==current.draftHash:body.expectedRevision!==undefined&&body.expectedRevision!==job.revision)fail('This question changed. Reload and review the current version.',409);
           if(!['approve','reject','skip','restore'].includes(body.decision))fail('Choose approve, request changes, skip, or return this question to review.');
-          if(typeof body.note!=='string'||body.note.trim().length<10||body.note.length>4000)fail('Add review notes of 10 to 4000 characters.');
+          if(body.note!==undefined&&typeof body.note!=='string')fail('Review notes must be text.');
+          const note=String(body.note||'').trim();
+          if(String(body.note||'').length>4000)fail('Review notes cannot exceed 4000 characters.');
+          if(body.decision==='reject'&&note.length<10)fail('Add at least 10 characters of review notes when requesting script changes.');
           if(job.mode===directMode?job.scriptRulesHash!==scriptPolicyHash:job.rulesHash!==rulesHash)fail('The script policy changed. Refresh and review this question.',409);
           await checkFresh(job);assertCurrent(job);
           if(body.decision==='reject'&&(current.status==='analyzing'||['analyzing','interrupted'].includes(job.status)))fail('This question or article is already being revised. Wait for the current request.',409);
@@ -222,8 +229,6 @@ export function createApp(env=process.env){
             if(current.status==='revision_pending'||current.status==='analyzing')fail('Apply this question’s requested changes before approving it.',409);
             if(current.status==='approved')fail('This question is already approved. Repeated approval will not generate another video.',409);
             if(current.validation.errors.length)fail('Resolve this question’s failed content checks.');
-            if(!body.checkedEvidence)fail('Confirm this script was checked against its source evidence.');
-            if(current.validation.warnings.length&&!body.checkedWarnings)fail('Acknowledge this question’s conditional-word and source flags.');
             try{assertSourceAudit(job,index);}catch{fail('The source audit has unresolved issues. Request changes.');}
           }
           if(body.decision==='skip'&&current.status!=='pending')fail('Only a pending question can be skipped.',409);
@@ -234,7 +239,7 @@ export function createApp(env=process.env){
             if(body.decision!=='approve')fail('A one-time video override can only accompany an approval.');
             overrideProfile=video.automation.oneTimeApproval(job.id,index,body.videoOverride,actor);
           }
-          const review=recordQuestionReview(job,index,{actor,decision:body.decision,note:body.note.trim(),checkedEvidence:Boolean(body.checkedEvidence),checkedWarnings:Boolean(body.checkedWarnings),at:new Date().toISOString(),testOnly:true,authenticated:!security.local,...(overrideProfile?{adminOverride:{type:'one_time_script_and_video_approval',reviewerReplaced:'Keziah',aspectRatio:overrideProfile.aspectRatio,maxEstimatedCost:overrideProfile.maxEstimatedCost,reason:overrideProfile.authorization}}:{})});
+          const review=recordQuestionReview(job,index,{actor,decision:body.decision,note,at:new Date().toISOString(),testOnly:true,authenticated:!security.local,...(overrideProfile?{adminOverride:{type:'one_time_script_and_video_approval',reviewerReplaced:'Keziah',aspectRatio:overrideProfile.aspectRatio,maxEstimatedCost:overrideProfile.maxEstimatedCost,reason:overrideProfile.authorization}}:{})});
           job.error=null;store.record(job.id,actor,'question_'+index+'_review_'+body.decision);store.save(job);
           if(body.decision==='approve')video.automation.enqueue(job.id,actor,index,overrideProfile?{profile:overrideProfile}:undefined);else if(body.decision==='reject')job=await scripts.start(job.id,review.note,index);
           if(['skip','restore'].includes(body.decision))job=store.get(job.id);
