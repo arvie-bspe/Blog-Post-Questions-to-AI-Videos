@@ -1,5 +1,5 @@
 import {approveFixture} from './question-fixture.mjs';
-import {recordQuestionReview} from '../src/question-approval.mjs';
+import {recordQuestionReview,storedApprovalHash} from '../src/question-approval.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync,readFileSync,writeFileSync,mkdirSync,existsSync,copyFileSync} from 'node:fs';
@@ -9,7 +9,8 @@ import {Store} from '../src/store.mjs';
 import {VideoService,publicJob} from '../src/video-service.mjs';
 import {HeyGen,mediaURL as heygenURL} from '../src/heygen.mjs';
 import {prepare as prepareHeyGen,subtitles,requestBody,estimate} from '../src/heygen-domain.mjs';
-import {prepare,approved,captions,scriptText} from '../src/video-domain.mjs';
+import {prepare,approved,captions,scriptText,currentVideoApproval} from '../src/video-domain.mjs';
+import {isCurrentVideo} from '../src/server.mjs';
 import {Fal,mediaURL,queueURL} from '../src/fal.mjs';
 import {mediaTools,presenterPath,compose} from '../src/media.mjs';
 import {appearanceRulesHash,config,rulesHash} from '../src/rules.mjs';
@@ -69,6 +70,18 @@ function harness({heygen={},media={check:async()=>true},limit=2,env={HEYGEN_API_
   return {dir,store,service,parent:shortParent(store),close(){service.closed=true;store.close();rmSync(dir,{recursive:true,force:true});}};
 }
 const idle=async(service,id)=>{for(let i=0;i<200&&service.active.has(id);i++)await new Promise(r=>setTimeout(r,10));assert.equal(service.active.has(id),false);};
+
+test('a completed unchanged video keeps its review form when a later validator rejects its stored approved script',async()=>{
+  const h=harness();try{
+    const created=await h.service.create(h.parent.id,hgSettings,'Arvie'),parent=h.store.get(h.parent.id);
+    parent.plan.videos[0].sentences[0].text+=':';
+    recordQuestionReview(parent,0,{actor:'Arvie',decision:'approve',note:'Historical approval recorded before the stricter validator.',at:'2026-09-22T13:48:58.910Z'});h.store.save(parent);
+    const saved=h.service.get(created.id);saved.script=scriptText(parent.plan.videos[0]);saved.approvalHash=storedApprovalHash(parent,0);saved.status='visual_review';saved.stage='visual_review';saved.files={...saved.files,video:true};saved.detectorVersion=config.video.faceDetectorVersion;saved.requests.video={id:'completed-historical-provider-request',state:'completed',submittedAt:'2026-09-22T13:49:08.642Z'};h.service.save(saved);
+    assert.throws(()=>approved(parent,0),/unresolved content checks/);assert.equal(currentVideoApproval(saved,parent,{allowCompletedStored:true}),true);assert.equal(isCurrentVideo(saved,parent,'heygen'),true);
+    await assert.rejects(h.service.validate(saved),/source or script review changed/);await assert.doesNotReject(h.service.validate(saved,{allowCompletedStoredApproval:true}));
+    const reviewed=await h.service.revisions.review(saved.id,{decision:'approve',note:'',expectedOutputRevision:1},'Macy');assert.ok(['delivery_pending','delivered'].includes(reviewed.status));await idle(h.service,saved.id);assert.equal(h.service.get(saved.id).status,'delivered');
+  }finally{h.close();}
+});
 
 test('mismatched manual profiles and saved setups cannot consume the daily allowance or call HeyGen',async()=>{
  const h=harness();try{

@@ -70,7 +70,7 @@ export class VideoRevisions{
     const s=this.service;
     if(this.reviewing.has(id)||s.active.has(id))fail('This video is already processing.',409);this.reviewing.add(id);
     try{
-      const j=s.get(id),genderCorrection=body.decision==='reject'&&body.changeType==='gender';await s.validate(j,{allowPresenterCorrection:genderCorrection});if(body.expectedOutputRevision!==undefined&&body.expectedOutputRevision!==(j.outputRevision||1))fail('This output changed. Review its current version.',409);
+      const j=s.get(id),genderCorrection=body.decision==='reject'&&body.changeType==='gender';await s.validate(j,{allowPresenterCorrection:genderCorrection,allowCompletedStoredApproval:true});if(body.expectedOutputRevision!==undefined&&body.expectedOutputRevision!==(j.outputRevision||1))fail('This output changed. Review its current version.',409);
       if(j.status!=='visual_review')fail('A completed render is required before visual review.',409);
       if(!['approve','reject'].includes(body.decision))fail('Choose approve or request changes.');
       if(body.note!==undefined&&typeof body.note!=='string')fail('Review notes must be text.');
@@ -94,7 +94,7 @@ export class VideoRevisions{
   async apply(id,body,actor){if(this.applying.has(id))fail('A video revision is already being applied.',409);this.applying.add(id);try{return await this.applyChange(id,body,actor);}finally{this.applying.delete(id);}}
   async applyChange(id,body,actor){
     const s=this.service;
-    const j=s.get(id);if(j.status!=='revision_pending'||s.active.has(id))fail('This video has no pending revision.',409);const type=body.changeType||j.revisionRequest?.type||'manual';await s.validate(j,{allowPresenterCorrection:type==='gender'});
+    const j=s.get(id);if(j.status!=='revision_pending'||s.active.has(id))fail('This video has no pending revision.',409);const type=body.changeType||j.revisionRequest?.type||'manual';await s.validate(j,{allowPresenterCorrection:type==='gender',allowCompletedStoredApproval:true});
     if(type==='script'){
       const parent=s.store.get(j.parentId);recordQuestionReview(parent,j.index,{actor,decision:'reject',note:`Video question ${j.index+1}: ${j.revisionRequest.note}`,at:now(),sourceVideoId:j.id});s.store.save(parent);
       j.revisionRequest.status='returned_to_content_review';s.save(j);if(s.onScriptChanges)await s.onScriptChanges(parent.id,parent.reviews.at(-1).note,j.index);return s.get(id);

@@ -4,7 +4,7 @@ import {VideoRevisions} from './video-revisions.mjs';
 import {randomUUID} from 'node:crypto';
 import {writeFileSync,mkdirSync,existsSync,statSync,createReadStream,readFileSync,copyFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {approved} from './video-domain.mjs';
+import {approved,currentVideoApproval} from './video-domain.mjs';
 import {ApprovalVideoAutomation} from './video-automation.mjs';
 import {prepare,prices,estimate,requestBody,subtitles,sourceFraming} from './heygen-domain.mjs';
 import {HeyGen,providerId} from './heygen.mjs';
@@ -67,7 +67,7 @@ export class VideoService {
     const nextToken=result.has_more&&typeof result.next_token==='string'?result.next_token:null,page={items,nextToken};
     if(this.pages.size>100)this.pages.clear();this.pages.set(key,{page,expires:Date.now()+300000});return page;
   }
-  async validate(j,{allowPresenterCorrection=false}={}){
+  async validate(j,{allowPresenterCorrection=false,allowCompletedStoredApproval=false}={}){
     if(!j.provider)error('This is a saved fal.ai setup. Prepare a new video from the current approved script; the old record is kept for history.',409);
     if(j.provider!=='heygen'&&!isWorkerVideoProvider(j.provider))error('This is a saved legacy setup. Prepare a new video from the current approved script; the old record is kept for history.',409);
     if(j.layoutVersion!==layoutVersion)error('This video uses the previous layout. Rebuild it with the current layout before review or delivery.',409);
@@ -75,8 +75,8 @@ export class VideoService {
     if(j.files?.video&&j.detectorVersion!==detectorVersion)error('Rebuild this saved footage with the current framing checks before video review or delivery. No new HeyGen render is needed.',409);
     const parent=this.store.get(j.parentId),requiredGender=presenterGender(parent.doc,parent.plan?.presenterContext);
     if(!allowPresenterCorrection&&requiredGender&&pair?.avatar.gender!==requiredGender)error(`PRESENTER_SOURCE_GENDER_MISMATCH: the explicit lawyer blurb requires an approved ${requiredGender} presenter and matching ${requiredGender} voice.`,409);
-    if(approved(parent,j.index)!==j.approvalHash)error('The source or script review changed. Prepare from the current approved version.',409);
-    await this.checkFresh(parent,j.index);if(approved(this.store.get(j.parentId),j.index)!==j.approvalHash)error('The content review changed during this request.',409);
+    if(!currentVideoApproval(j,parent,{allowCompletedStored:allowCompletedStoredApproval}))error('The source or script review changed. Prepare from the current approved version.',409);
+    await this.checkFresh(parent,j.index);if(!currentVideoApproval(j,this.store.get(j.parentId),{allowCompletedStored:allowCompletedStoredApproval}))error('The content review changed during this request.',409);
   }
   async applyWorkerTask(task){return applyLocalVideoTask(this,task);}
   failWorkerTask(task){
@@ -190,7 +190,7 @@ export class VideoService {
   async review(id,body,actor){return publicJob(await this.revisions.review(id,body,actor));}
   deliver(id){
     if(this.active.has(id))return;const j=this.get(id);if(j.status!=='delivery_pending')return;this.active.add(id);
-    const current=async()=>{if(this.closed)throw new Error('Delivery paused during restart.');await this.validate(j);const saved=this.get(id);if(saved.status!=='delivery_pending'||saved.outputRevision!==j.outputRevision||saved.reviews.at(-1)?.decision!=='approve')throw new Error('The approved video changed before upload.');};
+    const current=async()=>{if(this.closed)throw new Error('Delivery paused during restart.');await this.validate(j,{allowCompletedStoredApproval:true});const saved=this.get(id);if(saved.status!=='delivery_pending'||saved.outputRevision!==j.outputRevision||saved.reviews.at(-1)?.decision!=='approve')throw new Error('The approved video changed before upload.');};
     this.delivery.deliver(j,this.directory(j),job=>{if(!this.closed)this.save(job);},current).then(()=>{if(!this.closed)this.manifest(j);}).catch(e=>{if(!this.closed){j.status='delivery_pending';j.error=e.message;this.save(j);}}).finally(()=>this.active.delete(id));
   }
   serve(res,req,path,type){
@@ -225,7 +225,7 @@ export class VideoService {
       send(res,200,result.body,result.type);return true;
     }
     const create=path.match(/^\/api\/jobs\/([a-f0-9-]+)\/videos$/);
-    if(create){if(req.method==='GET')send(res,200,this.list(create[1]).map(j=>{let currentApproval=false;try{currentApproval=j.approvalHash===approved(this.store.get(j.parentId),j.index);}catch{}return {...publicJob(j),currentApproval};}));else if(req.method==='POST')send(res,200,await this.create(create[1],await json(req),actor));else error('Unsupported request.',405);return true;}
+    if(create){if(req.method==='GET')send(res,200,this.list(create[1]).map(j=>({...publicJob(j),currentApproval:currentVideoApproval(j,this.store.get(j.parentId),{allowCompletedStored:true})})));else if(req.method==='POST')send(res,200,await this.create(create[1],await json(req),actor));else error('Unsupported request.',405);return true;}
     const route=path.match(/^\/api\/videos\/([a-f0-9-]+)(?:\/(speech|render|resume|retry-worker|review|revise|deliver|file|layout-upgrade|framing-replacement))?$/);if(!route)return false;
     const [,,action]=route,id=route[1];
     if(req.method==='GET'&&!action){send(res,200,publicJob(this.get(id)));return true;}
@@ -241,7 +241,7 @@ export class VideoService {
     if(action==='framing-replacement'){send(res,200,publicJob(await this.revisions.replaceFraming(id,actor)));return true;}
     if(action==='retry-worker'){send(res,202,publicJob(await retryWorkerVideo(this,id,actor)));return true;}
     if(action==='revise'){send(res,200,publicJob(await this.revisions.apply(id,body,actor)));return true;}
-    if(action==='deliver'){await this.validate(this.get(id));this.deliver(id);send(res,202,publicJob(this.get(id)));return true;}
+    if(action==='deliver'){await this.validate(this.get(id),{allowCompletedStoredApproval:true});this.deliver(id);send(res,202,publicJob(this.get(id)));return true;}
     send(res,action==='review'?200:202,action==='review'?await this.review(id,body,actor):await this.start(id,action,body,actor));return true;
   }
 }

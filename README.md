@@ -17,6 +17,8 @@ Production app: [Article Video Studio](https://article-video-studio-production.u
 7. Macy reviews each finished video separately, including professional suit/blazer clothing and a natural voice that suits the presenter's persona. Approval needs no note or checklist; requesting a change requires a note. New renders use visually reviewed business attire and explicitly compatible voice pairings; casual shirts, T-shirts and polos are excluded. A layout change reuses existing media; a wording change returns to Keziah; a presenter, voice, or lip-sync change queues a new render with a newly rotated avatar and voice.
 8. Macy's approval automatically uploads the MP4, thumbnail, and VTT captions to the job's Google Drive Visual folder.
 
+A completed video remains available for Macy's review when its saved approval hash, exact spoken script, and source hash still match the current approved question, even if a later validator would reject that historical wording. This compatibility applies only to finished media; every new script approval and provider submission still passes the current validation rules.
+
 The former **Video Content and Script Rules** do not run in the new direct-document path. Historical jobs keep their original policy references for audit history. The active appearance and quality rules still govern the video output.
 
 ## Components

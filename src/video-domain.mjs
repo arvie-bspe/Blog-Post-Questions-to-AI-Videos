@@ -1,4 +1,4 @@
-import {approvedQuestion as approved} from './question-approval.mjs';
+import {approvedQuestion as approved,storedApprovalHash} from './question-approval.mjs';
 import {repeatsScriptHeading} from './script-content.mjs';
 import {hash,validatePlan} from './domain.mjs';
 import {rulesHash} from './rules.mjs';
@@ -8,6 +8,13 @@ export const models={speech:'fal-ai/kokoro/american-english',alignment:'fal-ai/e
 export const prices={checked:'2026-09-14',speechPerThousandCharacters:0.02,alignmentPerStartedHour:0.22,videoPerSecond:0.15,currency:'USD'};
 export const presenterId='studio-presenter-01';
 export const scriptText=v=>{if(repeatsScriptHeading(v))throw new Error('The script repeats its title/question. Revise and approve the corrected script before rendering.');return [v.question,...v.sentences.map(s=>s.text),v.cta,v.disclaimer].filter(Boolean).join('\n\n');};
+export function completedVideoMatchesStoredApproval(video,job){
+  try{return video?.files?.video===true&&storedApprovalHash(job,video.index)===video.approvalHash&&video.script===scriptText(job.plan.videos[video.index])&&video.source?.sourceHash===job.doc?.sourceHash;}catch{return false;}
+}
+export function currentVideoApproval(video,job,{allowCompletedStored=false}={}){
+  try{if(approved(job,video.index)===video.approvalHash)return true;}catch{}
+  return allowCompletedStored&&completedVideoMatchesStoredApproval(video,job);
+}
 export {approvedQuestion as approved} from "./question-approval.mjs";
 export function prepare(job,body,assetHash){
   const index=body.index,approvalHash=approved(job,index),video=job.plan.videos[index];

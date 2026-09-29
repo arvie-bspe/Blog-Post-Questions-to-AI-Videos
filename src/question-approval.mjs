@@ -19,6 +19,11 @@ export function assertSourceAudit(job,index){
  if(required&&job.audit?.passed!==true)throw new Error('The source audit has unresolved issues.');
  return job.audit||null;
 }
+export function storedApprovalHash(job,index){
+ const state=questionState(job,index);
+ if(state.status!=='approved'||!state.reviews.length)return null;
+ return hash([state.draftHash,state.reviews.at(-1)]);
+}
 export function approvedQuestion(job,index){
  const state=questionState(job,index);
  if(job.mode===directMode){if(job.scriptRulesHash!==scriptPolicyHash)throw new Error('The script policy changed. Review the current question again.');}
@@ -26,7 +31,7 @@ export function approvedQuestion(job,index){
  if(state.status!=='approved')throw new Error('Finish the content review for this question before creating its video.');
  if(state.validation.errors.length)throw new Error('This question has unresolved content checks.');
  assertSourceAudit(job,index);
- return hash([state.draftHash,state.reviews.at(-1)]);
+ return storedApprovalHash(job,index);
 }
 export function updateQuestionStatus(job){
  if(!job.plan?.videos?.length)return job;
