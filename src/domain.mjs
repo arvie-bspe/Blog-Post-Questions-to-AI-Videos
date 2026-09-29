@@ -1,5 +1,6 @@
 import {resolveArticleIdentity} from './article-identity.mjs';
 import {repeatsScriptHeading} from './script-content.mjs';
+import {directMode} from './workflow-config.mjs';
 import {createHash} from 'node:crypto';
 export const normalize=s=>String(s??'').normalize('NFKC').replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim().toLowerCase();
 export const hash=v=>createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
@@ -234,6 +235,9 @@ export function validateDirectPlan(plan,doc,max=4,targetSeconds=30){
   }
   return {errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
 }
-export const validateForJob=(plan,doc,client,max=4,targetSeconds=30)=>doc?.questionSelectionMode==='ai_independent'?validateDirectPlan(plan,doc,max,targetSeconds):validatePlan(plan,doc,client,max);
+export const validateForJob=(plan,doc,client,max=4,targetSeconds=30,mode)=>{
+  const directShape=Array.isArray(plan?.videos)&&plan.videos.every(video=>['explicit_source','formulated_source'].includes(video?.selectionKind));
+  return doc?.questionSelectionMode==='ai_independent'||mode===directMode&&directShape?validateDirectPlan(plan,doc,max,targetSeconds):validatePlan(plan,doc,client,max);
+};
 export const identity=(row,doc,mode,rulesHash)=>hash([mode,normalize(row.clientKey),row.documentId,doc.sourceHash,rulesHash]);
 export const recordIdentity=(row,doc,mode,rulesHash,client)=>hash([identity(row,doc,mode,rulesHash),hash(client),row.order,row.folderId]);

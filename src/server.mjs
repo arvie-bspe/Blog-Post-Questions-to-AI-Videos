@@ -171,7 +171,7 @@ export function createApp(env=process.env){
           if(source.row.documentId!==job.row.documentId||source.client.key!==job.client.key)fail('This row now points to a different article or client. Inspect it as a new article.',409);
           job.history=[...(job.history||[]),{at:job.updated,doc:job.doc,row:job.row,client:job.client,plan:job.plan,reviews:job.reviews,revision:job.revision,rulesHash:job.rulesHash,reason:'Source refreshed from Google.'}];
           Object.assign(job,source,{mode:job.mode===directMode?directMode:'live_google',rulesHash,appearanceRulesHash:job.mode===directMode?appearanceRulesHash:undefined,rulesVersion:job.mode===directMode?workflowVersion:config.version,reviews:[],questionReviews:[],questionRequests:{},questionAudits:{},setupIssues:job.mode===directMode?directSetupIssues(source.row,source.client):[...source.row.issues],status:job.plan?'content_review':'inspected',error:null});
-          if(job.plan)job.validation=validateForJob(job.plan,job.doc,job.client,4,scriptTargetSeconds(job));
+          if(job.plan)job.validation=validateForJob(job.plan,job.doc,job.client,4,scriptTargetSeconds(job),job.mode);
           const identity=job.mode===directMode?hash([directMode,job.row.documentId,job.row.tabId,job.doc.sourceHash,scriptPolicyHash]):recordIdentity(job.row,job.doc,job.mode,rulesHash,job.client);
           store.db.exec('BEGIN IMMEDIATE');try{adoptSourceIdentity(store,job,identity,id=>video.list(id).length>0);store.save(job);store.record(job.id,actor,'refresh_live_source');store.db.exec('COMMIT');}catch(e){store.db.exec('ROLLBACK');throw e;}return send(res,200,job);
         }
@@ -189,7 +189,7 @@ export function createApp(env=process.env){
           const body=await json(req);if(body.expectedRevision!==job.revision)fail('The record changed. Reload before changing its script runtime.',409);
           const targetSeconds=Number(body.targetSeconds);if(![30,60].includes(targetSeconds))fail('Choose a 30-second target or the approved 60-second override.');
           const previous=scriptTargetSeconds(job);job.scriptTargetSeconds=targetSeconds;job.runtimeOverrides=[...(job.runtimeOverrides||[]),{actor,at:new Date().toISOString(),previous,targetSeconds,note:String(body.note||'').trim()}];
-          if(job.plan)job.validation=validateForJob(job.plan,job.doc,job.client,4,targetSeconds);job.error=null;updateQuestionStatus(job);store.record(job.id,actor,'set_script_runtime_'+targetSeconds);return send(res,200,store.save(job));
+          if(job.plan)job.validation=validateForJob(job.plan,job.doc,job.client,4,targetSeconds,job.mode);job.error=null;updateQuestionStatus(job);store.record(job.id,actor,'set_script_runtime_'+targetSeconds);return send(res,200,store.save(job));
         }
         if(action==='manual-revision'){
           if(account.role!=='admin')fail('An admin manages historical manual draft updates.',403);

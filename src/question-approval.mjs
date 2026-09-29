@@ -10,7 +10,7 @@ export function questionState(job,index){
  const fingerprint=questionHash(job,index),reviews=(job.questionReviews||[]).filter(r=>r.index===index&&r.draftHash===fingerprint),last=reviews.at(-1),request=job.questionRequests?.[index];
  const pending=request?.draftHash===fingerprint&&['working','awaiting_manual_update','failed'].includes(request.status);
  const decision=last?.decision,status=pending?(request.status==='working'?'analyzing':'revision_pending'):decision==='approve'?'approved':decision==='reject'?'revision_pending':decision==='skip'?'skipped':'pending';
- return {index,draftHash:fingerprint,question:job.plan.videos[index].question,status,reviews,request:request?.draftHash===fingerprint?request:null,validation:validateForJob(questionPlan(job,index),job.doc,job.client,1,scriptTargetSeconds(job))};
+ return {index,draftHash:fingerprint,question:job.plan.videos[index].question,status,reviews,request:request?.draftHash===fingerprint?request:null,validation:validateForJob(questionPlan(job,index),job.doc,job.client,1,scriptTargetSeconds(job),job.mode)};
 }
 export function assertSourceAudit(job,index){
  const state=questionState(job,index),saved=job.questionAudits?.[index],audit=saved?.draftHash===state.draftHash?saved:null;

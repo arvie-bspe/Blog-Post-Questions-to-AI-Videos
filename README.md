@@ -19,6 +19,8 @@ Production app: [Article Video Studio](https://article-video-studio-production.u
 
 A completed video remains available for Macy's review when its saved approval hash, exact spoken script, and source hash still match the current approved question, even if a later validator would reject that historical wording. This compatibility applies only to finished media; every new script approval and provider submission still passes the current validation rules.
 
+Historical direct Google Doc jobs are also identified by their saved workflow mode and direct-script shape when applying script checks. They therefore use the active source-grounded direct review policy even when an older saved document lacks the newer `questionSelectionMode` marker.
+
 The former **Video Content and Script Rules** do not run in the new direct-document path. Historical jobs keep their original policy references for audit history. The active appearance and quality rules still govern the video output.
 
 ## Components

@@ -10,7 +10,7 @@ import {TaskQueue} from '../src/task-queue.mjs';
 import {Store} from '../src/store.mjs';
 import {ScriptWorkflow} from '../src/script-workflow.mjs';
 import {prepareLocal,prepareWorkerVideo} from '../src/local-video.mjs';
-import {recordQuestionReview} from '../src/question-approval.mjs';
+import {questionState,recordQuestionReview} from '../src/question-approval.mjs';
 import {directMode,scriptPolicyHash} from '../src/workflow-config.mjs';
 
 const paragraph=(text,startIndex,style='NORMAL_TEXT')=>({startIndex,paragraph:{paragraphStyle:{namedStyleType:style},elements:[{textRun:{content:text+'\n'}}]}});
@@ -32,6 +32,13 @@ test('new direct validation is source-grounded without reapplying retired conten
   const plan={articleIdentity:{name:'',address:'',phone:'',evidence:[]},presenterContext:{gender:'unspecified',lawyerBlurbParagraphIds:[]},videos:[{candidateId:'formulated-1',question:'How does filing work?',reason:'This gives viewers a direct procedural answer.',thumbnailTitle:'How Filing Works',selectionKind:'formulated_source',supportingParagraphIds:['p1'],runtimeReason:'',sentences:[{text:'Generally, the firm files the form electronically.',evidence:[{paragraphId:'p1',quote:'Generally, the firm files the form electronically.'}]}],cta:'',disclaimer:'',reviewFlags:[]}],skipped:[]};
   assert.deepEqual(validateDirectPlan(plan,doc,2),{errors:[],warnings:[]});
   assert.match(directInstructions(),/previous Video Content and Script Rules document is retired/i);
+});
+
+test('historical direct jobs without the document marker still use direct validation',()=>{
+  const doc={sourceHash:'historical-source',paragraphs:[{id:'p1',style:'NORMAL_TEXT',text:'Co-op buyers typically submit a detailed board package.'}]};
+  const plan={articleIdentity:{name:'',address:'',phone:'',evidence:[]},presenterContext:{gender:'unspecified',lawyerBlurbParagraphIds:[]},videos:[{candidateId:'historical-q1',question:'What Does a Co-Op Buyer Submit?',reason:'This gives buyers a direct preparation answer.',thumbnailTitle:'Co-Op Buyer Documents',selectionKind:'formulated_source',supportingParagraphIds:['p1'],runtimeReason:'',sentences:[{text:'Co-op buyers typically submit a detailed board package.',evidence:[{paragraphId:'p1',quote:'Co-op buyers typically submit a detailed board package.'}]}],cta:'',disclaimer:'',reviewFlags:[]}],skipped:[]};
+  const job={mode:directMode,scriptRulesHash:scriptPolicyHash,doc,plan,client:{},questionReviews:[],reviews:[]};
+  const state=questionState(job,0);assert.equal(state.status,'pending');assert.deepEqual(state.validation,{errors:[],warnings:[]});
 });
 
 test('an article-specific 60-second override permits a substantive one-minute direct script',()=>{

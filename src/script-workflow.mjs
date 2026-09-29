@@ -96,7 +96,7 @@ export class ScriptWorkflow{
       if(questionHash(current,index)!==draftHash)throw new Error('This question changed while the rewrite was running. Review the current draft.');
       const validated=validateDirectResult(result,current,{onlyQuestion:true});
       current.history=[...(current.history||[]),{at:current.updated,plan:structuredClone(current.plan),questionReviews:current.questionReviews,reviews:current.reviews,reason:'Single question rewritten by the configured AI provider.'}];
-      current.plan.videos[index]=validated.plan.videos[0];current.validation=validateForJob(current.plan,current.doc,current.client,4,scriptTargetSeconds(current));
+      current.plan.videos[index]=validated.plan.videos[0];current.validation=validateForJob(current.plan,current.doc,current.client,4,scriptTargetSeconds(current),current.mode);
       current.questionRequests[index]={...current.questionRequests[index],draftHash:questionHash(current,index),status:'applied',error:null};
       current.questionAudits={...(current.questionAudits||{}),[index]:{...validated.audit,draftHash:questionHash(current,index)}};updateQuestionStatus(current);current.error=null;this.store.save(current);this.store.record(jobId,'system','question_'+index+'_revision_finished');return current;
     }
