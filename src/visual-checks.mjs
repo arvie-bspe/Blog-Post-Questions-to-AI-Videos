@@ -27,7 +27,8 @@ export function containsContact(text,contact={}){
 }
 export function endCardData(job){
  const identity=job.articleIdentity;
- const data={name:identity?.name,address:identity?.address,phone:identity?.phone,targetUrl:job.endCard?.targetUrl||job.source?.targetUrl};
+ const correction=job.contactCorrection?.type==='admin_end_card_contact'?job.endCard:null;
+ const data={name:correction?.name||identity?.name,address:correction?.address||identity?.address,phone:correction?.phone||identity?.phone,targetUrl:job.endCard?.targetUrl||job.source?.targetUrl};
  for(const [key,value]of Object.entries(data))if(typeof value!=='string'||!value.trim()||/[{}\\<>\x00-\x1f]/.test(value))throw new Error('MISSING_END_CARD_DATA: '+key+' must come from the approved structured input.');
  let url;try{url=new URL(data.targetUrl);}catch{throw new Error('MISSING_END_CARD_DATA: the monthly row needs a valid article page URL in E.');}
  if(!['https:','http:'].includes(url.protocol)||url.username||url.password)throw new Error('MISSING_END_CARD_DATA: invalid article page URL.');

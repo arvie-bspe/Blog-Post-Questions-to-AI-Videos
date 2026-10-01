@@ -27,3 +27,10 @@ test('script and video approvals use optional notes without review checkboxes',(
   assert.match(video,/optional for approval/);
   assert.doesNotMatch(video,/checkedVideo|checkedCaptions|checkedContacts|checkedFraming|checkedNoNap|checkedEndCard/);
 });
+
+test('admins can correct end-card contacts while reusing saved media',()=>{
+  const video=readFileSync(new URL('../public/video-ui.js',import.meta.url),'utf8');
+  assert.match(video,/Correct end-card contact information/);
+  assert.match(video,/No HeyGen request is made/);
+  assert.match(video,/videos\/\$\{current\.id\}\/contact-revision/);
+});

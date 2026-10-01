@@ -227,7 +227,7 @@ export class VideoService {
     }
     const create=path.match(/^\/api\/jobs\/([a-f0-9-]+)\/videos$/);
     if(create){if(req.method==='GET')send(res,200,this.list(create[1]).map(j=>({...publicJob(j),currentApproval:currentVideoApproval(j,this.store.get(j.parentId),{allowCompletedStored:true})})));else if(req.method==='POST')send(res,200,await this.create(create[1],await json(req),actor));else error('Unsupported request.',405);return true;}
-    const route=path.match(/^\/api\/videos\/([a-f0-9-]+)(?:\/(speech|render|resume|retry-worker|review|revise|deliver|file|layout-upgrade|framing-replacement|paid-replacement))?$/);if(!route)return false;
+    const route=path.match(/^\/api\/videos\/([a-f0-9-]+)(?:\/(speech|render|resume|retry-worker|review|revise|deliver|file|layout-upgrade|framing-replacement|paid-replacement|contact-revision))?$/);if(!route)return false;
     const [,,action]=route,id=route[1];
     if(req.method==='GET'&&!action){send(res,200,publicJob(this.get(id)));return true;}
     if(['GET','HEAD'].includes(req.method)&&action==='file'){
@@ -241,6 +241,7 @@ export class VideoService {
     if(action==='layout-upgrade'){send(res,202,publicJob(await this.revisions.upgrade(id,actor)));return true;}
     if(action==='framing-replacement'){send(res,200,publicJob(await this.revisions.replaceFraming(id,actor)));return true;}
     if(action==='paid-replacement'){if(account?.role!=='admin')error('An admin account is required for a one-time paid replacement.',403);send(res,202,publicJob(await this.revisions.replaceFailedRender(id,body,actor)));return true;}
+    if(action==='contact-revision'){if(account?.role!=='admin')error('An admin account is required for an end-card contact correction.',403);send(res,202,publicJob(await this.revisions.correctEndCard(id,body,actor)));return true;}
     if(action==='retry-worker'){send(res,202,publicJob(await retryWorkerVideo(this,id,actor)));return true;}
     if(action==='revise'){send(res,200,publicJob(await this.revisions.apply(id,body,actor)));return true;}
     if(action==='deliver'){await this.validate(this.get(id),{allowCompletedStoredApproval:true});this.deliver(id);send(res,202,publicJob(this.get(id)));return true;}

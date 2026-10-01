@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {containsContact,endCardData,layoutVersion,logoContrastBackground} from '../src/visual-checks.mjs';
+import {containsContact,endCardData,layoutVersion,detectorVersion,logoContrastBackground} from '../src/visual-checks.mjs';
 import {layoutText} from '../src/layout-text.mjs';
 import {visualSettings} from '../src/portrait-media.mjs';
 import {rules,config,rulesHash} from '../src/rules.mjs';
@@ -14,7 +14,7 @@ import {reconcileRules} from '../src/rules-migration.mjs';
 import {VideoService} from '../src/video-service.mjs';
 import {inspect,parseClients,parseMonthly} from '../src/domain.mjs';
 import {preparedExample} from '../src/sample.mjs';
-import {scriptText} from '../src/video-domain.mjs';
+import {approved,scriptText} from '../src/video-domain.mjs';
 import {fixture} from './fixture-data.mjs';
 function parent(store,old=false){const raw=fixture('paul'),row=parseMonthly(fixture('monthly')).find(r=>r.documentId===raw.documentId),doc=inspect(raw),client=parseClients(fixture('clients')).find(c=>c.key===row.clientKey),j=store.create({identity:'source',row,doc,client,mode:'saved_snapshot',rulesHash:old?'previous-1.3-rules':rulesHash,rulesVersion:old?'1.2.0':config.version});j.plan=preparedExample(doc);j.origin='Prepared in Codex';j.status='pilot_reviewed';j.reviews=[{actor:'Keziah',decision:'approve',note:'Automated fixture only'}];approveFixture(j);store.save(j);return j;}
 
@@ -52,5 +52,17 @@ test('old-layout upgrade reuses source media once without any provider call or c
   const p=parent(store),old={id:'old-video',identity:'old',avatar:{id:'Brandon_Business_Sitting_Front_public'},voice:{id:'00e3d285aba44b27a83c47c02c9c2d9c'},parentId:p.id,provider:'heygen',layoutVersion:'earlier',approvalHash:'earlier',source:{sourceHash:p.doc.sourceHash,folderUrl:p.row.folderUrl},client:p.client,index:0,script:scriptText(p.plan.videos[0]),requests:{video:{id:'existing-provider-id',state:'completed'}},files:{original:true,voice:true,video:true},reviews:[],status:'visual_review'};old.cues=[{start:0,end:20,text:old.script.toUpperCase()}];s.save(old);const before=s.get(old.id),folder=s.directory(old);writeFileSync(join(folder,'presenter.mp4'),'source footage fixture');writeFileSync(join(folder,'voice.wav'),'speech fixture');
   s.ensureLogo=async()=>{};s.work=async j=>{j.status='visual_review';s.save(j);};
   const next=await s.revisions.upgrade(old.id,'Macy');await new Promise(r=>setTimeout(r,20));const repeat=await s.revisions.upgrade(old.id,'Macy');assert.equal(repeat.id,next.id);assert.equal(paid,0);assert.deepEqual(s.get(old.id),before);assert.equal(next.layoutVersion,layoutVersion);assert.deepEqual(next.reviews,[]);assert.equal(next.endCard.targetUrl,p.row.pageUrl);assert.equal(readFileSync(join(s.directory(next),'presenter.mp4'),'utf8'),'source footage fixture');await assert.rejects(s.validate(old),/previous layout/);
+ }finally{s.closed=true;store.close();rmSync(dir,{recursive:true,force:true});}
+});
+test('admin contact correction rebuilds only the end card and makes no provider request',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'contact-revision-')),store=new Store(join(dir,'db'));let paid=0;
+ const s=new VideoService({store,env:{},dataDir:dir,local:true,checkFresh:async()=>{},media:{check:async()=>{}},heygen:{submit:async()=>{paid++;}},logos:{},delivery:{}});
+ try{
+  const p=parent(store),old={id:'contact-video',identity:'contact-old',parentId:p.id,provider:'heygen',index:0,layoutVersion,detectorVersion,approvalHash:approved(p,0),articleIdentity:{name:'Avenue Law Firm',address:'505 Park Avenue, Suite 1201 in Manhattan',phone:'(212) 729-4090'},endCard:{name:'Avenue Law Firm',address:'505 Park Avenue, Suite 1201 in Manhattan',phone:'(212) 729-4090',targetUrl:p.row.pageUrl,seconds:3},source:{sourceHash:p.doc.sourceHash,rulesHash,folderUrl:p.row.folderUrl,targetUrl:p.row.pageUrl},client:{...p.client,address:'505 Park Ave #1201, New York, NY 10022, United States'},question:p.plan.videos[0].question,thumbnailTitle:'Test End Card Contact',script:scriptText(p.plan.videos[0]),avatar:{id:'Brandon_Business_Sitting_Front_public'},voice:{id:'00e3d285aba44b27a83c47c02c9c2d9c'},requests:{video:{id:'already-paid',state:'completed'}},files:{original:true,voice:true,logo:true,video:true,thumbnail:true,captions:true,manifest:true},cues:[{start:0,end:20,text:scriptText(p.plan.videos[0]).toUpperCase()}],reviews:[],status:'changes_requested',outputRevision:1};
+  s.save(old);const before=s.get(old.id),folder=s.directory(old);for(const name of ['presenter.mp4','voice.wav','logo.png'])writeFileSync(join(folder,name),name);
+  s.ensureLogo=async()=>{throw new Error('The saved logo should be reused.');};s.work=async j=>{assert.equal(endCardData(j).address,'505 Park Ave #1201, New York, NY 10022, United States');j.status='visual_review';j.stage='visual_review';j.files={...j.files,video:true,thumbnail:true,captions:true,manifest:true};s.save(j);};
+  const body={name:'Avenue Law Firm',address:'505 Park Ave #1201, New York, NY 10022, United States',phone:'(212) 729-4090',reason:'Correct the Avenue end-card mailing address.',expectedOutputRevision:1};
+  const next=await s.revisions.correctEndCard(old.id,body,'Arvie');await new Promise(r=>setTimeout(r,20));const repeat=await s.revisions.correctEndCard(old.id,body,'Arvie');
+  assert.equal(repeat.id,next.id);assert.equal(s.get(next.id).status,'visual_review');assert.equal(s.get(next.id).endCard.address,body.address);assert.equal(s.get(next.id).contactCorrection.previous.address,old.endCard.address);assert.equal(s.get(next.id).layoutRebuild.providerRequests,0);assert.equal(readFileSync(join(s.directory(next),'presenter.mp4'),'utf8'),'presenter.mp4');assert.deepEqual(s.get(old.id),before);assert.equal(s.list().length,2);assert.equal(paid,0);
  }finally{s.closed=true;store.close();rmSync(dir,{recursive:true,force:true});}
 });

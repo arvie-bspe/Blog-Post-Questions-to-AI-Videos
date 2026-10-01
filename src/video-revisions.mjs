@@ -105,6 +105,34 @@ export class VideoRevisions{
       return j;
     }finally{this.applying.delete(id);}
   }
+  async correctEndCard(id,body,actor){
+    const s=this.service;
+    if(this.applying.has(id)||s.active.has(id))fail('This video is already processing.',409);this.applying.add(id);
+    try{
+      const old=s.get(id),reason=String(body.reason||'').trim();
+      if(!old.files?.original||!old.files?.voice||!old.files?.video)fail('A finished video with saved presenter footage and speech is required for an end-card-only rebuild.',409);
+      if(body.expectedOutputRevision!==undefined&&body.expectedOutputRevision!==(old.outputRevision||1))fail('This output changed. Reload before correcting its end card.',409);
+      if(reason.length<10||reason.length>1000)fail('Add 10 to 1000 characters explaining the contact correction.');
+      await s.validate(old,{allowCompletedStoredApproval:true});
+      const parent=s.store.get(old.parentId),approvalHash=approved(parent,old.index);
+      if(scriptText(parent.plan.videos[old.index])!==old.script||parent.doc.sourceHash!==old.source.sourceHash)fail('The script or source changed. Prepare a new video from the current reviewed content.',409);
+      const text=(key,maximum)=>{const value=String(body[key]??old.endCard?.[key]??'').trim();if(!value||value.length>maximum||/[{}\\<>\x00-\x1f]/.test(value))fail(`Enter a valid end-card ${key}.`);return value;};
+      const previous={name:old.endCard?.name||old.articleIdentity?.name,address:old.endCard?.address||old.articleIdentity?.address,phone:old.endCard?.phone||old.articleIdentity?.phone,targetUrl:old.endCard?.targetUrl||old.source?.targetUrl};
+      const corrected={name:text('name',200),address:text('address',300),phone:text('phone',80),targetUrl:previous.targetUrl,seconds:3};
+      if(JSON.stringify(corrected)===JSON.stringify({...previous,seconds:3}))fail('Change at least one end-card contact field.');
+      const at=now(),contactCorrection={type:'admin_end_card_contact',actor,at,reason,previous,updated:{name:corrected.name,address:corrected.address,phone:corrected.phone,targetUrl:corrected.targetUrl}};
+      endCardData({...old,endCard:corrected,contactCorrection});
+      const identity=hash([old.id,old.outputRevision||1,'admin_end_card_contact',approvalHash,corrected]);
+      const existing=s.db.prepare('SELECT payload FROM videos WHERE identity=?').get(identity);if(existing)return JSON.parse(existing.payload);
+      const j={...structuredClone(old),id:randomUUID(),identity,approvalHash,endCard:corrected,contactCorrection,previousVideoId:old.id,created:at,createdBy:actor,status:'compositing',stage:'compositing',error:null,files:{original:true,voice:true,logo:false,video:false,thumbnail:false,captions:false,manifest:false},reviews:[],reviewHistory:[],revisionRequest:null,delivery:null,outputRevision:1,technicalQA:null,automation:null,layoutRebuild:{fromVideoId:old.id,providerRequests:0,type:'end_card_contact_only'}};
+      const from=s.directory(old),to=s.directory(j);
+      for(const name of ['presenter.mp4','voice.wav','provider-captions.srt','alignment.json'])if(existsSync(join(from,name)))copyFileSync(join(from,name),join(to,name));
+      if(existsSync(join(from,'logo.png'))){copyFileSync(join(from,'logo.png'),join(to,'logo.png'));j.files.logo=true;}
+      s.save(j);s.active.add(j.id);s.store.record(parent.id,actor,'rebuild_end_card_contact_without_provider_request');
+      (async()=>{if(!j.files.logo)await s.ensureLogo(j);await s.work(j);})().catch(error=>{if(!s.closed){j.status='needs_attention';j.error=error.message;s.save(j);}}).finally(()=>s.active.delete(j.id));
+      return j;
+    }finally{this.applying.delete(id);}
+  }
   async review(id,body,actor){
     const s=this.service;
     if(this.reviewing.has(id)||s.active.has(id))fail('This video is already processing.',409);this.reviewing.add(id);
