@@ -36,6 +36,20 @@ The former **Video Content and Script Rules** do not run in the new direct-docum
 
 `VIDEO_PROVIDER=heygen` is explicit in production. Historical LiteAvatar, local-worker, and older HeyGen records remain readable for audit history, but they are never silently reused for a new paid submission.
 
+## Railway operations
+
+GitHub `main` is the canonical production source. Normal releases are committed and pushed to `main`, then Railway deploys the connected repository. Do not use `railway up` to bypass that release path.
+
+Use an interactive Railway CLI login for human-operated status checks, logs, and authorized Railway administration. From the checked-out repository, run:
+
+```powershell
+railway login
+railway link
+railway status
+```
+
+Link the existing **blog-post-questions-to-ai-videos** project, **production** environment, and **article-video-studio** service. The CLI session is private to the signed-in Windows user and is stored outside this repository. Do not place `RAILWAY_TOKEN` or `RAILWAY_API_TOKEN` in source files, `.env` files, documentation examples, or shared artifacts. Keep the existing `/data` volume attached during every authorized Railway operation.
+
 ## Railway configuration
 
 Copy the settings from [.env.example](.env.example) into Railway Variables, using private values:
