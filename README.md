@@ -32,7 +32,7 @@ The former **Video Content and Script Rules** do not run in the new direct-docum
 | Node web app | Railway | Sign-in, Google Doc retrieval, reviews, job state, assembly, and Drive delivery. |
 | SQLite queue | Existing Railway volume | Durable task leases, results, review history, and media records. Keep one Railway replica. |
 | Codex worker | Arvie's signed-in Windows account | Script author using the saved local Codex login. It opens no inbound port. |
-| HeyGen API | External provider | Approved Studio Avatar, matching voice, speech, lip-sync, source footage, and caption timing. |
+| HeyGen | External provider | Approved Studio Avatar, matching voice, speech, lip-sync, source footage, and caption timing. |
 
 `VIDEO_PROVIDER=heygen` is explicit in production. Historical LiteAvatar, local-worker, and older HeyGen records remain readable for audit history, but they are never silently reused for a new paid submission.
 
